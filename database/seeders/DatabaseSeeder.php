@@ -15,11 +15,24 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        // 1. Örnek bir firma oluştur
+        $firma = \App\Models\Firma::create([
+            'firma_adi' => 'Demo Şirketi A.Ş.',
+            'vergi_no' => '1234567890',
+            'vergi_dairesi' => 'Merkez',
+            'adres' => 'Örnek Mah. Test Sok. No:1',
+            'durum' => true,
         ]);
+
+        // 2. Bu firmaya bağlı bir yönetici kullanıcı oluştur
+        \App\Models\Kullanici::create([
+            'firma_id' => $firma->id,
+            'ad_soyad' => 'Sistem Yöneticisi',
+            'eposta' => 'admin@admin.com',
+            'sifre' => bcrypt('password'), // Şifre: password
+            'rol' => 'yonetici',
+        ]);
+        
+        $this->command->info('Örnek firma ve yönetici kullanıcısı (admin@admin.com / password) oluşturuldu.');
     }
 }
