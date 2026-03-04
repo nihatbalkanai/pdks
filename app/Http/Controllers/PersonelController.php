@@ -62,6 +62,10 @@ class PersonelController extends Controller
             'cikis_tarihi' => 'nullable|date',
             'durum' => 'boolean',
             'notlar' => 'nullable|string',
+            'email' => 'nullable|email|max:255',
+            'telefon' => 'nullable|string|max:50',
+            'gec_kalma_bildirimi' => 'boolean',
+            'dogum_tarihi' => 'nullable|date',
         ]);
 
         if (empty($validated['ad_soyad'])) {
@@ -118,6 +122,10 @@ class PersonelController extends Controller
             'cikis_tarihi' => 'nullable|date',
             'durum' => 'boolean',
             'notlar' => 'nullable|string',
+            'email' => 'nullable|email|max:255',
+            'telefon' => 'nullable|string|max:50',
+            'gec_kalma_bildirimi' => 'boolean',
+            'dogum_tarihi' => 'nullable|date',
         ]);
 
         $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
@@ -125,6 +133,31 @@ class PersonelController extends Controller
         $personel->update($validated);
 
         return response()->json(['success' => true, 'personel' => $personel]);
+    }
+
+    /**
+     * Personel resim yükleme
+     */
+    public function resimYukle(Request $request, $id)
+    {
+        $request->validate([
+            'resim' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
+        ]);
+
+        $personel = Personel::withoutGlobalScopes()->findOrFail($id);
+
+        // Eski resmi sil
+        if ($personel->resim_yolu && file_exists(public_path($personel->resim_yolu))) {
+            unlink(public_path($personel->resim_yolu));
+        }
+
+        $dosyaAdi = 'personel_' . $id . '_' . time() . '.' . $request->resim->extension();
+        $request->resim->move(public_path('uploads/personel'), $dosyaAdi);
+
+        $personel->resim_yolu = 'uploads/personel/' . $dosyaAdi;
+        $personel->save();
+
+        return response()->json(['success' => true, 'resim_yolu' => $personel->resim_yolu]);
     }
 
     /**

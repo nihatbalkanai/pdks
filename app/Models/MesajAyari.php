@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MesajAyari extends Model
 {
-    use HasFactory, \Illuminate\Database\Eloquent\Concerns\HasUuids, \Illuminate\Database\Eloquent\SoftDeletes, \App\Models\Scopes\FirmaScopeTrait;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'mesaj_ayarlari';
 
@@ -15,12 +16,32 @@ class MesajAyari extends Model
         'firma_id',
         'kanal',
         'api_anahtari',
-        'gonderici_basligi',
         'durum',
+        // SMTP
+        'smtp_host',
+        'smtp_port',
+        'smtp_sifreleme',
+        'smtp_kullanici',
+        'smtp_sifre',
+        'gonderen_email',
+        'gonderen_ad',
+        // SMS
+        'sms_api_url',
+        'sms_kullanici',
+        'sms_sifre',
+        'sms_baslik',
+        'sablonlar',
     ];
 
     protected $casts = [
         'durum' => 'boolean',
+        'sablonlar' => 'array',
+    ];
+
+    protected $hidden = [
+        'smtp_sifre',
+        'sms_sifre',
+        'api_key',
     ];
 
     public function firma()

@@ -1,0 +1,214 @@
+<script setup>
+import { ref } from 'vue';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import { Head, router, useForm } from '@inertiajs/vue3';
+import Swal from 'sweetalert2';
+
+const props = defineProps({
+    kesintiler: Array,
+    bordroAlanlari: Array,
+    personeller: Array,
+    filtreler: Object,
+});
+
+const selectedRow = ref(null);
+const showAddForm = ref(false);
+
+const form = useForm({
+    personel_id: '',
+    tarih: '',
+    tutar: '',
+    aciklama: '',
+    bordro_alani: 'AVANS',
+});
+
+const filtreBordro = ref(props.filtreler?.bordro_alani || '');
+const filtreTarih = ref(props.filtreler?.tarih || '');
+
+const applyFilter = () => {
+    router.get(route('avans-kesintiler.index'), {
+        bordro_alani: filtreBordro.value || undefined,
+        tarih: filtreTarih.value || undefined,
+    }, { preserveState: true });
+};
+
+const formatTarih = (t) => {
+    if (!t) return '';
+    return new Date(t).toLocaleDateString('tr-TR');
+};
+
+const formatTutar = (t) => {
+    if (!t) return '0,00';
+    return Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+};
+
+const submitForm = () => {
+    form.post(route('avans-kesintiler.store'), {
+        onSuccess: () => {
+            showAddForm.value = false;
+            form.reset();
+            Swal.fire({ title: 'Başarılı!', text: 'Avans/kesinti eklendi.', icon: 'success', timer: 1500 });
+        },
+        onError: () => {
+            Swal.fire('Hata', 'Kayıt eklenirken hata oluştu.', 'error');
+        }
+    });
+};
+
+const deleteRecord = () => {
+    if (!selectedRow.value) return;
+    Swal.fire({
+        title: 'Emin misiniz?',
+        text: 'Bu kaydı silmek istediğinize emin misiniz?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonText: 'İptal',
+        confirmButtonText: 'Sil'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            router.delete(route('avans-kesintiler.destroy', selectedRow.value), {
+                onSuccess: () => {
+                    selectedRow.value = null;
+                    Swal.fire({ title: 'Silindi!', icon: 'success', timer: 1500 });
+                }
+            });
+        }
+    });
+};
+</script>
+
+<template>
+    <Head title="Avans ve Kesintiler" />
+    <AuthenticatedLayout>
+        <div class="p-4 h-full flex flex-col">
+            <div class="bg-white border border-gray-400 shadow-md flex flex-col h-full">
+                <div class="bg-gradient-to-r from-[#d8e4f8] to-[#c0d0e8] border-b border-gray-400 px-4 py-2">
+                    <h2 class="font-bold text-sm text-gray-800">Avans ve Kesintiler</h2>
+                </div>
+
+                <!-- Filtre -->
+                <div class="flex items-center gap-4 px-4 py-2 bg-gray-50 border-b border-gray-300 text-xs">
+                    <div class="flex items-center">
+                        <label class="mr-2 font-semibold">Hazır bordro alanı:</label>
+                        <select v-model="filtreBordro" @change="applyFilter" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-40">
+                            <option value="">Tümü</option>
+                            <option v-for="b in bordroAlanlari" :key="b" :value="b">{{ b }}</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center">
+                        <label class="mr-2 font-semibold">Tarih:</label>
+                        <input type="date" v-model="filtreTarih" @change="applyFilter" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-36" />
+                    </div>
+                    <div class="ml-auto">
+                        <button @click="showAddForm = !showAddForm" class="bg-[#e8eef8] border border-gray-400 rounded-sm px-3 py-1 text-xs hover:bg-[#d0dce8] flex items-center">
+                            <svg class="w-4 h-4 mr-1 text-green-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-2-4a2 2 0 114 0 2 2 0 01-4 0zm-2-8a4 4 0 118 0 4 4 0 01-8 0z" clip-rule="evenodd"></path></svg>
+                            Personel Seçimi
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Yeni Kayıt Formu -->
+                <div v-if="showAddForm" class="px-4 py-3 bg-yellow-50 border-b border-gray-300 text-xs">
+                    <div class="flex items-end gap-3">
+                        <div>
+                            <label class="block font-semibold mb-1">Personel</label>
+                            <select v-model="form.personel_id" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-48">
+                                <option value="">Seçiniz</option>
+                                <option v-for="p in personeller" :key="p.id" :value="p.id">{{ p.kart_no }} - {{ p.ad }} {{ p.soyad }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Tarih</label>
+                            <input type="date" v-model="form.tarih" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-32" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Tutar</label>
+                            <input type="number" step="0.01" v-model="form.tutar" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-24 text-right" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Açıklama</label>
+                            <input type="text" v-model="form.aciklama" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-48" />
+                        </div>
+                        <div>
+                            <label class="block font-semibold mb-1">Bordro Alanı</label>
+                            <select v-model="form.bordro_alani" class="border-gray-300 rounded-sm py-1 px-2 text-xs w-36">
+                                <option value="AVANS">AVANS</option>
+                                <option value="SSK">SSK</option>
+                                <option value="CEZA">CEZA</option>
+                                <option value="TEB BANKASI">TEB BANKASI</option>
+                                <option value="EK ÖDEME">EK ÖDEME</option>
+                            </select>
+                        </div>
+                        <button @click="submitForm" class="bg-green-600 text-white px-4 py-1 rounded-sm hover:bg-green-700 font-bold">Ekle</button>
+                        <button @click="showAddForm = false" class="bg-gray-400 text-white px-3 py-1 rounded-sm hover:bg-gray-500">İptal</button>
+                    </div>
+                </div>
+
+                <!-- Tablo -->
+                <div class="flex-1 overflow-auto">
+                    <table class="w-full text-xs border-collapse">
+                        <thead class="bg-[#d0dcea] sticky top-0 z-10">
+                            <tr>
+                                <th class="py-1.5 px-2 text-left border border-gray-400 font-bold">KartNo</th>
+                                <th class="py-1.5 px-2 text-left border border-gray-400 font-bold">İsim</th>
+                                <th class="py-1.5 px-2 text-left border border-gray-400 font-bold">Soyadı</th>
+                                <th class="py-1.5 px-2 text-right border border-gray-400 font-bold">Maaş</th>
+                                <th class="py-1.5 px-2 text-left border border-gray-400 font-bold">Tarih</th>
+                                <th class="py-1.5 px-2 text-right border border-gray-400 font-bold">Tutar</th>
+                                <th class="py-1.5 px-2 text-left border border-gray-400 font-bold">Açıklama</th>
+                                <th class="py-1.5 px-2 text-left border border-gray-400 font-bold">Bordro Alanı</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="k in kesintiler" :key="k.id"
+                                @click="selectedRow = k.id"
+                                class="cursor-pointer border-b border-gray-200 hover:bg-blue-50 transition-colors"
+                                :class="{'!bg-yellow-200 font-semibold': selectedRow === k.id}">
+                                <td class="py-1 px-2 border-r border-gray-200">{{ k.kart_no }}</td>
+                                <td class="py-1 px-2 border-r border-gray-200">{{ k.isim }}</td>
+                                <td class="py-1 px-2 border-r border-gray-200">{{ k.soyad }}</td>
+                                <td class="py-1 px-2 border-r border-gray-200 text-right">{{ formatTutar(k.maas) }}</td>
+                                <td class="py-1 px-2 border-r border-gray-200">{{ formatTarih(k.tarih) }}</td>
+                                <td class="py-1 px-2 border-r border-gray-200 text-right">{{ formatTutar(k.tutar) }}</td>
+                                <td class="py-1 px-2 border-r border-gray-200">{{ k.aciklama }}</td>
+                                <td class="py-1 px-2">{{ k.bordro_alani }}</td>
+                            </tr>
+                            <tr v-if="kesintiler.length === 0">
+                                <td colspan="8" class="py-8 text-center text-gray-400">Gösterilecek kayıt yok</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Alt Butonlar -->
+                <div class="flex items-center justify-end gap-1 px-4 py-2 bg-gray-100 border-t border-gray-400">
+                    <button @click="showAddForm = true" class="win-btn" title="Yeni Ekle">
+                        <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    </button>
+                    <button class="win-btn" title="Kaydet">
+                        <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    </button>
+                    <button class="win-btn" title="Yazdır">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    </button>
+                    <button class="win-btn" title="Onayla">
+                        <svg class="w-5 h-5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    </button>
+                    <button @click="deleteRecord" class="win-btn" title="Sil">
+                        <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                    <button class="win-btn" title="Excel">
+                        <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </AuthenticatedLayout>
+</template>
+
+<style scoped>
+.win-btn {
+    @apply w-8 h-8 flex items-center justify-center bg-white border border-gray-400 rounded-sm hover:bg-gray-100 shadow-sm cursor-pointer transition;
+}
+</style>

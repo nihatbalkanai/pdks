@@ -21,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'abonelik' => \App\Http\Middleware\AbonelikKontrol::class,
             'superadmin' => \App\Http\Middleware\SuperAdminKontrol::class,
+            'rol.yetki' => \App\Http\Middleware\RolYetkiKontrol::class,
         ]);
 
         //

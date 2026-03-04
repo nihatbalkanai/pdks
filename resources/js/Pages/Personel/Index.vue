@@ -1,8 +1,7 @@
 <script setup>
-import { ref, watch, onMounted, computed } from 'vue';
+import { ref, watch, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
-import Modal from '@/Components/Modal.vue';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 
@@ -11,38 +10,43 @@ const props = defineProps({
     filtreler: Object,
 });
 
-// Normal Sayfa Durumu
-const aramaAna = ref(props.filtreler.arama || '');
-watch(aramaAna, (value) => {
-    router.get(route('personeller.index'), { arama: value }, { preserveState: true, replace: true });
-});
-
-// Dev Modal Durumu
-const isCardModalOpen = ref(false);
-const modalSearch = ref('');
+const aramaAna = ref(props.filtreler?.arama || '');
 const localPersoneller = ref([...(props.personeller?.data || [])]);
+const searchText = ref('');
+const activeTab = ref('ozluk');
+const activeSubTab = ref('genel');
+const isLoading = ref(false);
+const isSaving = ref(false);
 
-// Tab State
-const activeTab = ref('ozluk'); // ozluk, giris_cikis, izin, avans, prim
-const activeSubTab = ref('genel'); // genel, ozluk_sub, not, zimmet
-
-// Seçili Personel
 const emptyPersonel = {
     id: null, kart_no: '', sicil_no: '', ad: '', soyad: '', ssk_no: '',
     unvan: '', sirket: '', bolum: '', ozel_kod: '', departman: '',
     servis_kodu: '', hesap_gurubu: '', agi: '', aylik_ucret: '',
     gunluk_ucret: '', saat_1: '', saat_2: '', saat_3: '',
-    giris_tarihi: '', cikis_tarihi: '', durum: true
+    giris_tarihi: '', cikis_tarihi: '', durum: true, notlar: '',
+    email: '', telefon: '', gec_kalma_bildirimi: false, resim_yolu: '',
+    izinler: [], avans_kesintiler: [], prim_kazanclar: [], zimmetler: [], pdks_kayitlari: []
 };
 
 const selectedPersonel = ref(JSON.parse(JSON.stringify(emptyPersonel)));
-const isLoading = ref(false);
 
+// Filtre
+const filteredPersoneller = computed(() => {
+    if (!searchText.value) return localPersoneller.value;
+    const q = searchText.value.toLowerCase();
+    return localPersoneller.value.filter(p =>
+        (p.kart_no || '').toLowerCase().includes(q) ||
+        (p.ad_soyad || '').toLowerCase().includes(q) ||
+        (p.ad || '').toLowerCase().includes(q) ||
+        (p.soyad || '').toLowerCase().includes(q)
+    );
+});
+
+// Personel seç
 const selectPersonel = async (personel) => {
     isLoading.value = true;
-    
     if (personel.id) {
-        // Önce liste verisini anında göster
+        // Hemen liste verisini göster
         const quick = { ...emptyPersonel, ...personel };
         if (!personel.ad && personel.ad_soyad) {
             const parts = personel.ad_soyad.split(' ');
@@ -51,7 +55,6 @@ const selectPersonel = async (personel) => {
         }
         selectedPersonel.value = quick;
 
-        // Sonra API'den detaylı veriyi çek
         try {
             const response = await axios.get(route('personeller.show', personel.id), {
                 headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
@@ -63,62 +66,39 @@ const selectPersonel = async (personel) => {
                     detail.ad = parts[0] || '';
                     detail.soyad = parts.slice(1).join(' ') || '';
                 }
-                // Mevcut quick data'yı kaybetme, API verisini üzerine yaz
                 Object.assign(selectedPersonel.value, detail);
             }
         } catch (e) {
             console.error('Personel detay yükleme hatası:', e);
-            // Quick data zaten yüklü, ek bir şey yapmaya gerek yok
         }
     } else {
-        const newP = { ...emptyPersonel, ...personel };
-        if (!personel.ad && personel.ad_soyad) {
-            const parts = personel.ad_soyad.split(' ');
-            newP.ad = parts[0] || '';
-            newP.soyad = parts.slice(1).join(' ') || '';
-        }
-        selectedPersonel.value = newP;
+        selectedPersonel.value = { ...emptyPersonel, ...personel };
     }
-    
     isLoading.value = false;
 };
 
-const isSaving = ref(false);
-
-const openModal = (personel = null) => {
-    isCardModalOpen.value = true;
-    if (personel) {
-        selectPersonel(personel);
-    } else {
-        selectedPersonel.value = JSON.parse(JSON.stringify(emptyPersonel));
-    }
+// Yeni personel
+const newPersonel = () => {
+    selectedPersonel.value = JSON.parse(JSON.stringify(emptyPersonel));
+    activeTab.value = 'ozluk';
+    activeSubTab.value = 'genel';
 };
 
-const closeModal = () => {
-    isCardModalOpen.value = false;
-};
-
-const formatZimmetTarihi = (tarih) => {
-    if (!tarih) return '';
-    return new Date(tarih).toLocaleDateString('tr-TR');
-};
-
+// Kaydet
 const savePersonel = async () => {
     isSaving.value = true;
     try {
-        let response;
         if (selectedPersonel.value.id) {
-            response = await axios.put(route('personeller.update', selectedPersonel.value.id), selectedPersonel.value);
-            Swal.fire({ title: 'Başarılı!', text: 'Personel bilgileri güncellendi.', icon: 'success', confirmButtonText: 'Tamam' });
+            await axios.put(route('personeller.update', selectedPersonel.value.id), selectedPersonel.value);
+            Swal.fire({ title: 'Başarılı!', text: 'Personel güncellendi.', icon: 'success', timer: 1500 });
         } else {
-            response = await axios.post(route('personeller.store'), selectedPersonel.value);
-            Swal.fire({ title: 'Başarılı!', text: 'Yeni personel kaydedildi.', icon: 'success', confirmButtonText: 'Tamam' });
+            const response = await axios.post(route('personeller.store'), selectedPersonel.value);
+            Swal.fire({ title: 'Başarılı!', text: 'Yeni personel kaydedildi.', icon: 'success', timer: 1500 });
             selectedPersonel.value = response.data.personel;
         }
         router.reload({ only: ['personeller'] });
         setTimeout(() => { localPersoneller.value = [...props.personeller.data] }, 1000);
     } catch (error) {
-        console.error(error);
         const msg = error.response?.data?.message || 'Kaydetme işlemi başarısız oldu.';
         Swal.fire('Hata!', msg, 'error');
     } finally {
@@ -126,433 +106,366 @@ const savePersonel = async () => {
     }
 };
 
+// Sil
 const deletePersonel = () => {
-    if(!selectedPersonel.value.id) return;
+    if (!selectedPersonel.value.id) return;
     Swal.fire({
-        title: 'Emin misiniz?',
-        text: "Bu personeli silmek istediğinize emin misiniz?",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Evet, Sil!',
-        cancelButtonText: 'İptal'
+        title: 'Emin misiniz?', text: 'Bu personeli silmek istediğinize emin misiniz?',
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
+        confirmButtonText: 'Evet, Sil!', cancelButtonText: 'İptal'
     }).then((result) => {
         if (result.isConfirmed) {
             router.delete(route('personeller.destroy', selectedPersonel.value.id), {
                 onSuccess: () => {
                     Swal.fire('Silindi!', 'Personel başarıyla silindi.', 'success');
                     selectedPersonel.value = JSON.parse(JSON.stringify(emptyPersonel));
-                    isCardModalOpen.value = false;
                 }
             });
         }
     });
 };
 
-const filteredLocalPersoneller = computed(() => {
-    if (!modalSearch.value) return localPersoneller.value;
-    const lower = modalSearch.value.toLowerCase();
-    return localPersoneller.value.filter(p => 
-        (p.kart_no || '').toLowerCase().includes(lower) || 
-        (p.ad_soyad || '').toLowerCase().includes(lower) || 
-        (p.ad || '').toLowerCase().includes(lower) || 
-        (p.soyad || '').toLowerCase().includes(lower)
-    );
-});
+const formatTarih = (t) => {
+    if (!t) return '';
+    return new Date(t).toLocaleDateString('tr-TR');
+};
+const formatTutar = (t) => {
+    if (!t) return '0,00';
+    return Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+};
+
+// Resim yükleme
+const resimInput = ref(null);
+const isUploading = ref(false);
+
+const triggerResimSec = () => {
+    if (!selectedPersonel.value.id) {
+        Swal.fire('Uyarı', 'Önce personeli kaydedin.', 'warning');
+        return;
+    }
+    resimInput.value.click();
+};
+
+const uploadResim = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    isUploading.value = true;
+    const formData = new FormData();
+    formData.append('resim', file);
+    try {
+        const response = await axios.post(route('personeller.resim-yukle', selectedPersonel.value.id), formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        selectedPersonel.value.resim_yolu = response.data.resim_yolu;
+        Swal.fire({ title: 'Başarılı!', text: 'Resim yüklendi.', icon: 'success', timer: 1500 });
+    } catch (e) {
+        Swal.fire('Hata', 'Resim yüklenirken hata oluştu.', 'error');
+    } finally {
+        isUploading.value = false;
+    }
+};
 </script>
 
 <template>
-    <Head title="Personel Yönetimi" />
-
+    <Head title="Personel Kartları" />
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex items-center justify-between">
-                <h2 class="text-xl font-semibold leading-tight text-gray-800">Personel Yönetimi</h2>
-                <button @click="openModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow transition">
-                    + Yeni Personel / Kart
-                </button>
-            </div>
-        </template>
-
-        <div class="py-12">
-            <div class="mx-auto max-w-7xl sm:px-6 lg:px-8 space-y-6">
-                <!-- Arama Kutusu -->
-                <div class="bg-white p-4 shadow-sm sm:rounded-lg flex justify-between">
-                    <input v-model="aramaAna" type="text" placeholder="Genel listede ad, soyad veya sicil no ile ara..." class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-1/3" />
+        <div class="p-4 h-full flex flex-col">
+            <div class="bg-white border border-gray-400 shadow-md flex flex-col h-full">
+                <!-- Pencere Başlığı -->
+                <div class="bg-gradient-to-r from-[#d8e4f8] to-[#c0d0e8] border-b border-gray-400 px-4 py-2">
+                    <h2 class="font-bold text-sm text-gray-800">Personel Kartları</h2>
                 </div>
 
-                <!-- Tablo -->
-                <div class="overflow-hidden bg-white shadow-sm sm:rounded-lg">
-                    <div class="p-6">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-left border-collapse">
-                                <thead>
-                                    <tr class="border-b bg-gray-50 text-gray-600 text-sm uppercase">
-                                        <th class="py-3 px-4">Ad Soyad</th>
-                                        <th class="py-3 px-4">Sicil No</th>
-                                        <th class="py-3 px-4">Bölüm</th>
-                                        <th class="py-3 px-4 text-right">İşlemler</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="personel in personeller.data" :key="personel.id" class="border-b hover:bg-gray-50 transition">
-                                        <td class="py-3 px-4">{{ personel.ad_soyad || (personel.ad + ' ' + personel.soyad) }}</td>
-                                        <td class="py-3 px-4 font-mono text-sm">{{ personel.sicil_no }}</td>
-                                        <td class="py-3 px-4">{{ personel.bolum || '-' }}</td>
-                                        <td class="py-3 px-4 text-right">
-                                            <button @click="openModal(personel)" class="text-indigo-600 hover:text-indigo-900 mx-2 font-bold">Kartı Aç</button>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="personeller.data.length === 0">
-                                        <td colspan="4" class="py-6 text-center text-gray-500">Hiç personel bulunamadı.</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                <div class="flex flex-1 overflow-hidden">
+                    <!-- SOL: Personel Listesi -->
+                    <div class="w-56 border-r border-gray-400 flex flex-col bg-gray-50">
+                        <div class="p-2 border-b border-gray-300">
+                            <input v-model="searchText" type="text" placeholder="🔍 Ara..."
+                                class="w-full border-gray-300 rounded-sm py-1 px-2 text-xs focus:ring-blue-400 focus:border-blue-400" />
+                        </div>
+                        <div class="flex-1 overflow-y-auto">
+                            <div v-for="p in filteredPersoneller" :key="p.id"
+                                @click="selectPersonel(p)"
+                                class="px-2 py-1.5 text-xs cursor-pointer border-b border-gray-200 hover:bg-blue-50 transition flex items-center"
+                                :class="{'!bg-blue-100 font-semibold border-l-2 border-l-blue-500': selectedPersonel.id === p.id}">
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium truncate">{{ p.ad || '' }} {{ p.soyad || '' }}</div>
+                                    <div class="text-[10px] text-gray-500">{{ p.kart_no || '-' }}</div>
+                                </div>
+                            </div>
+                            <div v-if="filteredPersoneller.length === 0" class="p-4 text-center text-gray-400 text-xs">Personel bulunamadı</div>
+                        </div>
+                        <div class="p-1 border-t border-gray-300 bg-gray-100 text-center text-[10px] text-gray-500">
+                            {{ filteredPersoneller.length }} personel
+                        </div>
+                    </div>
+
+                    <!-- SAĞ: Detay Alanı -->
+                    <div class="flex-1 flex flex-col overflow-hidden">
+                        <!-- Üst Sekmeler -->
+                        <div class="flex bg-gray-100 border-b border-gray-400">
+                            <button @click="activeTab = 'ozluk'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'ozluk'}">Özlük Bilgileri</button>
+                            <button @click="activeTab = 'giris_cikis'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'giris_cikis'}">Giriş-Çıkış</button>
+                            <button @click="activeTab = 'izin'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'izin'}">İzin</button>
+                            <button @click="activeTab = 'avans'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'avans'}">Avans Kesinti</button>
+                            <button @click="activeTab = 'prim'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'prim'}">Prim Kazanç</button>
+                            <button @click="activeTab = 'not'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'not'}">Notlar</button>
+                            <button @click="activeTab = 'zimmet'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'zimmet'}">Zimmet</button>
+                        </div>
+
+                        <!-- İçerik -->
+                        <div class="flex-1 overflow-y-auto p-3">
+                            <!-- Loading -->
+                            <div v-if="isLoading" class="flex items-center justify-center h-full">
+                                <div class="text-gray-400 text-sm">Yükleniyor...</div>
+                            </div>
+
+                            <!-- ÖZLÜK -->
+                            <div v-else-if="activeTab === 'ozluk'" class="space-y-3">
+                                <!-- Alt Sekme -->
+                                <div class="flex gap-1 mb-2">
+                                    <button @click="activeSubTab = 'genel'" class="subtab-btn" :class="{'subtab-active': activeSubTab === 'genel'}">Genel</button>
+                                    <button @click="activeSubTab = 'ozluk_sub'" class="subtab-btn" :class="{'subtab-active': activeSubTab === 'ozluk_sub'}">Özlük</button>
+                                </div>
+
+                                <div v-if="activeSubTab === 'genel'">
+                                    <div class="flex gap-4">
+                                        <!-- Resim Alanı -->
+                                        <div class="flex flex-col items-center">
+                                            <div class="w-28 h-32 border-2 border-dashed border-gray-300 rounded bg-gray-50 flex items-center justify-center overflow-hidden cursor-pointer hover:border-blue-400 transition" @click="triggerResimSec">
+                                                <img v-if="selectedPersonel.resim_yolu" :src="'/' + selectedPersonel.resim_yolu" class="w-full h-full object-cover" />
+                                                <div v-else class="text-center text-gray-400">
+                                                    <svg class="w-10 h-10 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                                                    <span class="text-[9px]">Resim Ekle</span>
+                                                </div>
+                                            </div>
+                                            <button @click="triggerResimSec" class="mt-1.5 text-[10px] text-blue-600 hover:text-blue-800 font-medium">{{ isUploading ? 'Yükleniyor...' : 'Fotoğraf Seç' }}</button>
+                                            <input ref="resimInput" type="file" accept="image/*" class="hidden" @change="uploadResim" />
+                                        </div>
+
+                                        <!-- Form Alanları -->
+                                        <div class="flex-1">
+                                            <div class="grid grid-cols-4 gap-x-3 gap-y-2">
+                                                <div class="form-group"><label>Kart No</label><input v-model="selectedPersonel.kart_no" class="form-input" /></div>
+                                                <div class="form-group"><label>Sicil No</label><input v-model="selectedPersonel.sicil_no" class="form-input" /></div>
+                                                <div class="form-group"><label>Ad</label><input v-model="selectedPersonel.ad" class="form-input" /></div>
+                                                <div class="form-group"><label>Soyad</label><input v-model="selectedPersonel.soyad" class="form-input" /></div>
+                                                <div class="form-group"><label>SSK No</label><input v-model="selectedPersonel.ssk_no" class="form-input" /></div>
+                                                <div class="form-group"><label>Ünvan</label><input v-model="selectedPersonel.unvan" class="form-input" /></div>
+                                                <div class="form-group"><label>Şirket</label><input v-model="selectedPersonel.sirket" class="form-input" /></div>
+                                                <div class="form-group"><label>Bölüm</label><input v-model="selectedPersonel.bolum" class="form-input" /></div>
+                                                <div class="form-group"><label>Özel Kod</label><input v-model="selectedPersonel.ozel_kod" class="form-input" /></div>
+                                                <div class="form-group"><label>Departman</label><input v-model="selectedPersonel.departman" class="form-input" /></div>
+                                                <div class="form-group"><label>Servis Kodu</label><input v-model="selectedPersonel.servis_kodu" class="form-input" /></div>
+                                                <div class="form-group"><label>Hesap Grubu</label><input v-model="selectedPersonel.hesap_gurubu" class="form-input" /></div>
+                                                <div class="form-group"><label>E-Posta</label><input v-model="selectedPersonel.email" type="email" class="form-input" placeholder="ornek@mail.com" /></div>
+                                                <div class="form-group"><label>Telefon</label><input v-model="selectedPersonel.telefon" class="form-input" placeholder="05XX XXX XX XX" /></div>
+                                                <div class="form-group"><label>Doğum Tarihi</label><input v-model="selectedPersonel.dogum_tarihi" type="date" class="form-input" /></div>
+                                                <div class="form-group col-span-2">
+                                                    <label>Geç Kalma Bildirimi</label>
+                                                    <div class="flex items-center mt-1">
+                                                        <button @click="selectedPersonel.gec_kalma_bildirimi = !selectedPersonel.gec_kalma_bildirimi" type="button"
+                                                            :class="selectedPersonel.gec_kalma_bildirimi ? 'bg-green-500' : 'bg-gray-300'"
+                                                            class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out">
+                                                            <span :class="selectedPersonel.gec_kalma_bildirimi ? 'translate-x-4' : 'translate-x-0'"
+                                                                class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out border border-gray-200"></span>
+                                                        </button>
+                                                        <span class="ml-2 text-[10px]" :class="selectedPersonel.gec_kalma_bildirimi ? 'text-green-600 font-semibold' : 'text-gray-500'">{{ selectedPersonel.gec_kalma_bildirimi ? 'Aktif - Mail/SMS gönderilecek' : 'Pasif' }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div v-if="activeSubTab === 'ozluk_sub'">
+                                    <div class="grid grid-cols-4 gap-x-3 gap-y-2">
+                                        <div class="form-group"><label>AGİ</label><input v-model="selectedPersonel.agi" class="form-input" /></div>
+                                        <div class="form-group"><label>Aylık Ücret</label><input v-model="selectedPersonel.aylik_ucret" type="number" class="form-input text-right" /></div>
+                                        <div class="form-group"><label>Günlük Ücret</label><input v-model="selectedPersonel.gunluk_ucret" type="number" class="form-input text-right" /></div>
+                                        <div class="form-group"><label>Saat 1</label><input v-model="selectedPersonel.saat_1" type="number" class="form-input text-right" /></div>
+                                        <div class="form-group"><label>Saat 2</label><input v-model="selectedPersonel.saat_2" type="number" class="form-input text-right" /></div>
+                                        <div class="form-group"><label>Saat 3</label><input v-model="selectedPersonel.saat_3" type="number" class="form-input text-right" /></div>
+                                        <div class="form-group"><label>Giriş Tarihi</label><input v-model="selectedPersonel.giris_tarihi" type="date" class="form-input" /></div>
+                                        <div class="form-group"><label>Çıkış Tarihi</label><input v-model="selectedPersonel.cikis_tarihi" type="date" class="form-input" /></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- GİRİŞ-ÇIKIŞ -->
+                            <div v-else-if="activeTab === 'giris_cikis'">
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Tarih</th><th>Saat</th><th>İşlem</th><th>Durum</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="k in (selectedPersonel.pdks_kayitlari || [])" :key="k.id">
+                                            <td>{{ formatTarih(k.kayit_tarihi) }}</td>
+                                            <td>{{ k.kayit_tarihi ? k.kayit_tarihi.substring(11,16) : '' }}</td>
+                                            <td><span :class="k.islem_tipi === 'Giriş' ? 'text-green-600' : 'text-red-600'" class="font-semibold">{{ k.islem_tipi }}</span></td>
+                                            <td>Başarılı</td>
+                                        </tr>
+                                        <tr v-if="!(selectedPersonel.pdks_kayitlari || []).length"><td colspan="4" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- İZİN -->
+                            <div v-else-if="activeTab === 'izin'">
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Tarih</th><th>Tatil Tipi</th><th>İzin Tipi</th><th>Giriş</th><th>Çıkış</th><th>Açıklama</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="iz in (selectedPersonel.izinler || [])" :key="iz.id">
+                                            <td>{{ formatTarih(iz.tarih) }}</td>
+                                            <td>{{ iz.tatil_tipi }}</td>
+                                            <td>{{ iz.izin_tipi }}</td>
+                                            <td>{{ iz.giris_saati }}</td>
+                                            <td>{{ iz.cikis_saati }}</td>
+                                            <td>{{ iz.aciklama }}</td>
+                                        </tr>
+                                        <tr v-if="!(selectedPersonel.izinler || []).length"><td colspan="6" class="text-center text-gray-400 py-6">İzin kaydı yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- AVANS KESİNTİ -->
+                            <div v-else-if="activeTab === 'avans'">
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Tarih</th><th>Tutar</th><th>Açıklama</th><th>Bordro Alanı</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="a in (selectedPersonel.avans_kesintiler || [])" :key="a.id">
+                                            <td>{{ formatTarih(a.tarih) }}</td>
+                                            <td class="text-right">{{ formatTutar(a.tutar) }}</td>
+                                            <td>{{ a.aciklama }}</td>
+                                            <td>{{ a.bordro_alani }}</td>
+                                        </tr>
+                                        <tr v-if="!(selectedPersonel.avans_kesintiler || []).length"><td colspan="4" class="text-center text-gray-400 py-6">Avans/kesinti kaydı yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- PRİM KAZANÇ -->
+                            <div v-else-if="activeTab === 'prim'">
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Tarih</th><th>Tutar</th><th>Açıklama</th><th>Bordro Alanı</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="p in (selectedPersonel.prim_kazanclar || [])" :key="p.id">
+                                            <td>{{ formatTarih(p.tarih) }}</td>
+                                            <td class="text-right">{{ formatTutar(p.tutar) }}</td>
+                                            <td>{{ p.aciklama }}</td>
+                                            <td>{{ p.bordro_alani }}</td>
+                                        </tr>
+                                        <tr v-if="!(selectedPersonel.prim_kazanclar || []).length"><td colspan="4" class="text-center text-gray-400 py-6">Prim/kazanç kaydı yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- NOTLAR -->
+                            <div v-else-if="activeTab === 'not'">
+                                <textarea v-model="selectedPersonel.notlar" rows="12"
+                                    class="w-full border-gray-300 rounded-sm text-xs p-2 focus:ring-blue-400 focus:border-blue-400"
+                                    placeholder="Personel notları..."></textarea>
+                            </div>
+
+                            <!-- ZİMMET -->
+                            <div v-else-if="activeTab === 'zimmet'">
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Kategori</th><th>Bölüm</th><th>Açıklama</th><th>Veriliş Tarihi</th><th>İade Tarihi</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="z in (selectedPersonel.zimmetler || [])" :key="z.id">
+                                            <td>{{ z.kategori }}</td>
+                                            <td>{{ z.bolum_adi }}</td>
+                                            <td>{{ z.aciklama }}</td>
+                                            <td>{{ formatTarih(z.verilis_tarihi) }}</td>
+                                            <td>{{ z.iade_tarihi ? formatTarih(z.iade_tarihi) : '-' }}</td>
+                                        </tr>
+                                        <tr v-if="!(selectedPersonel.zimmetler || []).length"><td colspan="5" class="text-center text-gray-400 py-6">Zimmet kaydı yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Alt Butonlar -->
+                        <div class="flex items-center justify-end gap-1 px-3 py-2 bg-gray-100 border-t border-gray-400">
+                            <button @click="newPersonel" class="win-btn" title="Yeni Personel">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                            </button>
+                            <button @click="savePersonel" :disabled="isSaving" class="win-btn" title="Kaydet">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                            </button>
+                            <button class="win-btn" title="Yazdır">
+                                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                            </button>
+                            <button @click="savePersonel" class="win-btn" title="Onayla">
+                                <svg class="w-5 h-5 text-green-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            </button>
+                            <button @click="deletePersonel" class="win-btn" title="Sil">
+                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                            </button>
+                            <button class="win-btn" title="Excel">
+                                <svg class="w-5 h-5 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- YENİ PERSONEL KARTI MODALI (WINDOWS FORM STILLİ) -->
-        <Modal :show="isCardModalOpen" @close="closeModal" maxWidth="4xl">
-            <div class="bg-gray-100 min-h-[600px] flex flex-col font-sans">
-                <!-- Modal Header -->
-                <div class="flex justify-between items-center py-2 px-4 bg-gray-200 border-b border-gray-300">
-                    <h3 class="font-semibold text-gray-700 text-sm">Personel Kartları</h3>
-                    <button @click="closeModal" class="text-gray-500 hover:text-red-500 font-bold">✕</button>
-                </div>
-
-                <div class="flex flex-1 overflow-hidden p-2 gap-2 h-[75vh]">
-                    <!-- Sol Panel (Liste) -->
-                    <div class="w-1/3 max-w-[300px] bg-white border border-gray-300 flex flex-col">
-                        <div class="p-2 border-b border-gray-300 flex items-center bg-gray-50">
-                            <input type="checkbox" class="mr-2 rounded text-indigo-600" />
-                            <label class="text-xs mr-2 whitespace-nowrap">Hızlı bakış:</label>
-                            <input v-model="modalSearch" type="text" class="w-full border-gray-300 rounded-sm py-1 px-2 text-xs focus:ring-0 focus:border-indigo-500" />
-                        </div>
-                        <div class="flex-1 overflow-y-auto bg-white">
-                            <table class="w-full text-xs">
-                                <thead class="bg-gray-200 sticky top-0 shadow-sm">
-                                    <tr>
-                                        <th class="py-1 px-2 text-left border-r border-gray-300 border-b w-12">Kart</th>
-                                        <th class="py-1 px-2 text-left border-r border-gray-300 border-b">Ad</th>
-                                        <th class="py-1 px-2 text-left border-b">Soyad</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="p in filteredLocalPersoneller" :key="p.id" 
-                                        @click="selectPersonel(p)"
-                                        class="cursor-pointer border-b border-gray-100 hover:bg-yellow-50"
-                                        :class="{'bg-yellow-100 font-medium': selectedPersonel.id === p.id}">
-                                        <td class="py-1 px-2 border-r border-gray-200">{{ p.kart_no || p.id }}</td>
-                                        <td class="py-1 px-2 border-r border-gray-200">{{ p.ad || p.ad_soyad?.split(' ')[0] }}</td>
-                                        <td class="py-1 px-2">{{ p.soyad || p.ad_soyad?.split(' ').slice(1).join(' ') }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <!-- Alt Navigasyon Barı (Görsel) -->
-                        <div class="p-1 bg-gray-100 border-t border-gray-300 flex justify-between items-center text-gray-500">
-                            <div class="flex space-x-1">
-                                <button class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-green-600">◀</button>
-                                <button class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-green-600">▶</button>
-                                <button @click="openModal(null)" class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-yellow-500">+</button>
-                                <button @click="savePersonel" class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-blue-500">✓</button>
-                                <button @click="deletePersonel" class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-red-500">✕</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Sağ Panel (Detaylar) -->
-                    <div class="flex-1 bg-white border border-gray-300 flex flex-col">
-                        <!-- Üst Sekmeler -->
-                        <div class="flex bg-gray-100 border-b border-gray-300 pt-2 px-2 overflow-x-auto">
-                            <button @click="activeTab='ozluk'" :class="{'bg-white border-t border-l border-r rounded-t-sm z-10 -mb-px text-black': activeTab=='ozluk', 'text-gray-600 hover:bg-gray-200 border-transparent': activeTab!='ozluk'}" class="px-4 py-2 text-xs font-semibold flex items-center border">
-                                🧍 Personel Özlük
-                            </button>
-                            <button @click="activeTab='giris_cikis'" :class="{'bg-white border-t border-l border-r rounded-t-sm z-10 -mb-px text-black': activeTab=='giris_cikis', 'text-gray-600 hover:bg-gray-200 border-transparent': activeTab!='giris_cikis'}" class="px-4 py-2 text-xs font-semibold flex items-center border">
-                                ⏱️ Giriş-Çıkış
-                            </button>
-                            <button @click="activeTab='izin'" :class="{'bg-white border-t border-l border-r rounded-t-sm z-10 -mb-px text-black': activeTab=='izin', 'text-gray-600 hover:bg-gray-200 border-transparent': activeTab!='izin'}" class="px-4 py-2 text-xs font-semibold flex items-center border">
-                                🏖️ İzin
-                            </button>
-                            <button @click="activeTab='avans'" :class="{'bg-white border-t border-l border-r rounded-t-sm z-10 -mb-px text-black': activeTab=='avans', 'text-gray-600 hover:bg-gray-200 border-transparent': activeTab!='avans'}" class="px-4 py-2 text-xs font-semibold flex items-center border">
-                                💸 Avans_Kesintiler
-                            </button>
-                            <button @click="activeTab='prim'" :class="{'bg-white border-t border-l border-r rounded-t-sm z-10 -mb-px text-black': activeTab=='prim', 'text-gray-600 hover:bg-gray-200 border-transparent': activeTab!='prim'}" class="px-4 py-2 text-xs font-semibold flex items-center border">
-                                💰 Prim_Kazançlar
-                            </button>
-                        </div>
-
-                        <!-- Sekme İçerikleri -->
-                        <div class="flex-1 p-4 overflow-y-auto">
-                            <!-- ÖZLÜK TAB -->
-                            <div v-if="activeTab==='ozluk'" class="text-sm h-full flex flex-col">
-                                <!-- GENEL TAB -->
-                                <div v-if="activeSubTab==='genel'" class="flex-1 flex flex-col">
-                                    <div class="flex gap-4">
-                                    <!-- Sol Form Grubu -->
-                                    <div class="flex-1 space-y-2">
-                                        <div class="flex items-center"><label class="w-1/4 text-gray-700 text-xs">Kart No:</label><input v-model="selectedPersonel.kart_no" type="text" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                        <div class="flex items-center"><label class="w-1/4 text-gray-700 text-xs">Sicil No:</label><input v-model="selectedPersonel.sicil_no" type="text" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm bg-gray-50" /></div>
-                                        <div class="flex items-center mt-2"><label class="w-1/4 text-gray-700 text-xs">Ad:</label><input v-model="selectedPersonel.ad" type="text" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                        <div class="flex items-center"><label class="w-1/4 text-gray-700 text-xs">Soyad:</label><input v-model="selectedPersonel.soyad" type="text" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                        <div class="flex items-center"><label class="w-1/4 text-gray-700 text-xs">SSK No:</label><input v-model="selectedPersonel.ssk_no" type="text" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                        <div class="flex items-center"><label class="w-1/4 text-gray-700 text-xs">Ünvan:</label><input v-model="selectedPersonel.unvan" type="text" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                        
-                                        <div class="flex items-center mt-4">
-                                            <label class="w-1/4 text-gray-700 text-xs">Şirket:</label>
-                                            <select v-model="selectedPersonel.sirket" class="w-3/4 text-xs py-1 border-gray-300 rounded-sm">
-                                                <option value="">Seçiniz</option>
-                                                <option value="Merkez">Merkez</option>
-                                                <option value="Şube">Şube</option>
-                                            </select>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <div class="flex-1 flex items-center"><label class="w-1/3 text-gray-700 text-xs">Bölüm:</label><input v-model="selectedPersonel.bolum" class="w-2/3 text-xs py-1 border-gray-300 rounded-sm"/></div>
-                                            <div class="flex-1 flex items-center"><label class="w-1/3 text-gray-700 text-xs">Özel Kod:</label><input v-model="selectedPersonel.ozel_kod" class="w-2/3 text-xs py-1 border-gray-300 rounded-sm"/></div>
-                                        </div>
-                                        <div class="flex items-center gap-2">
-                                            <div class="flex-1 flex items-center"><label class="w-1/3 text-gray-700 text-xs">Departman:</label><input v-model="selectedPersonel.departman" class="w-2/3 text-xs py-1 border-gray-300 rounded-sm"/></div>
-                                            <div class="flex-1 flex items-center"><label class="w-1/3 text-gray-700 text-xs">Servis:</label><input v-model="selectedPersonel.servis_kodu" class="w-2/3 text-xs py-1 border-gray-300 rounded-sm"/></div>
-                                        </div>
-                                        <div class="flex items-center gap-2 mt-4">
-                                            <div class="flex-1 flex items-center"><label class="w-1/3 text-gray-700 text-xs">Hesap Gurubu:</label><input v-model="selectedPersonel.hesap_gurubu" class="w-2/3 text-xs py-1 border-gray-300 rounded-sm"/></div>
-                                            <div class="flex-1 flex items-center"><label class="w-1/3 text-gray-700 text-xs text-right pr-2">A.G.İ:</label><input v-model="selectedPersonel.agi" class="w-2/3 text-xs py-1 border-gray-300 rounded-sm"/></div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Sağ Resim Alanı -->
-                                    <div class="w-32 flex flex-col pt-2">
-                                        <div class="w-full h-32 border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50 text-gray-400 text-xs mb-1 relative overflow-hidden">
-                                            <span v-if="!selectedPersonel.resim_yolu">Resim yok!</span>
-                                            <img v-else :src="selectedPersonel.resim_yolu" class="object-cover w-full h-full" />
-                                        </div>
-                                        <div class="text-[10px] text-center text-gray-500">120x130</div>
-                                    </div>
-                                </div>
-
-                                <!-- Alt Çerçeve: Çalışma Bilgileri -->
-                                <div class="mt-6 border border-gray-300 rounded-sm p-3 relative">
-                                    <span class="absolute -top-2 left-2 bg-white px-1 text-xs text-gray-600">Çalışma bilgileri</span>
-                                    
-                                    <div class="flex gap-4">
-                                        <div class="w-1/2 space-y-2">
-                                            <div class="flex items-center"><label class="w-1/3 text-xs text-right pr-2">Aylık ücret:</label><input v-model="selectedPersonel.aylik_ucret" type="number" class="w-2/3 text-xs py-1 text-right border-gray-300 rounded-sm" /></div>
-                                            <div class="flex items-center"><label class="w-1/3 text-xs text-right pr-2">Günlük ücret:</label><input v-model="selectedPersonel.gunluk_ucret" type="number" class="w-2/3 text-xs py-1 text-right border-gray-300 rounded-sm bg-gray-50" /></div>
-                                            <div class="flex items-center"><label class="w-1/3 text-xs text-right pr-2">Saat 1 (A):</label><input v-model="selectedPersonel.saat_1" type="number" class="w-2/3 text-xs py-1 text-right border-gray-300 rounded-sm bg-gray-50" /></div>
-                                            <div class="flex items-center"><label class="w-1/3 text-xs text-right pr-2">Saat 2 (B):</label><input v-model="selectedPersonel.saat_2" type="number" class="w-2/3 text-xs py-1 text-right border-gray-300 rounded-sm bg-gray-50" /></div>
-                                            <div class="flex items-center"><label class="w-1/3 text-xs text-right pr-2">Saat 3 (C):</label><input v-model="selectedPersonel.saat_3" type="number" class="w-2/3 text-xs py-1 text-right border-gray-300 rounded-sm bg-gray-50" /></div>
-                                        </div>
-                                        <div class="w-1/2 flex flex-col space-y-3 pt-1">
-                                            <button class="bg-gray-200 hover:bg-gray-300 text-xs py-1 px-4 rounded border border-gray-300 shadow-sm self-start">Ücreti Değiştir</button>
-                                            <div class="pt-2">
-                                                <div class="flex items-center mb-2"><label class="w-24 text-xs">Giriş tarihi:</label><input v-model="selectedPersonel.giris_tarihi" type="date" class="flex-1 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                            </div>
-                                            <div class="pt-1">
-                                                <div class="flex items-center"><label class="w-24 text-xs">Çıkış tarihi:</label><input v-model="selectedPersonel.cikis_tarihi" type="date" class="flex-1 text-xs py-1 border-gray-300 rounded-sm" /></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                </div>
-                                <!-- END GENEL TAB -->
-
-                                <!-- NOT TAB -->
-                                <div v-if="activeSubTab==='not'" class="flex-1 flex flex-col">
-                                    <textarea 
-                                        v-model="selectedPersonel.notlar" 
-                                        class="w-full h-full min-h-[400px] border-gray-300 rounded-sm text-sm focus:border-indigo-500 focus:ring-indigo-500 p-2"
-                                        placeholder="Buraya notlarınızı yazabilirsiniz... (Örn: SSK BRÜT: 2.797,56 SSK NET:2.090,11)"
-                                    ></textarea>
-                                </div>
-
-                                <!-- ZİMMET TAB -->
-                                <div v-if="activeSubTab==='zimmet'" class="flex-1 flex flex-col space-y-4">
-                                    <div class="h-64 overflow-y-auto border border-gray-300">
-                                        <table class="w-full text-xs text-left">
-                                            <thead class="bg-gray-100 sticky top-0">
-                                                <tr>
-                                                    <th class="py-1 px-2 border-r border-b">Kategori</th>
-                                                    <th class="py-1 px-2 border-r border-b">Açıklama</th>
-                                                    <th class="py-1 px-2 border-r border-b">Veriliş Tarihi</th>
-                                                    <th class="py-1 px-2 border-b">İade Tarihi</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                <tr v-for="zimmet in selectedPersonel.zimmetler || []" :key="zimmet.id" class="border-b bg-blue-100/30">
-                                                    <td class="py-1 px-2 border-r">{{ zimmet.kategori }}</td>
-                                                    <td class="py-1 px-2 border-r">{{ zimmet.aciklama }}</td>
-                                                    <td class="py-1 px-2 border-r">{{ formatZimmetTarihi(zimmet.verilis_tarihi) }}</td>
-                                                    <td class="py-1 px-2">{{ formatZimmetTarihi(zimmet.iade_tarihi) }}</td>
-                                                </tr>
-                                                <tr v-if="!(selectedPersonel.zimmetler && selectedPersonel.zimmetler.length)">
-                                                    <td colspan="4" class="py-10 text-center text-gray-400">&lt;Gösterilecek Bilgi yok&gt;</td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    
-                                    <div class="grid grid-cols-2 gap-4 text-xs pt-4">
-                                        <div class="space-y-2">
-                                            <div class="flex items-center"><label class="w-24">Bölüm Adı:</label><select class="flex-1 border-gray-300 py-1 rounded-sm text-xs"><option>Seçiniz</option></select><button class="ml-2 bg-gray-200 border border-gray-300 px-2 rounded-sm py-1 font-semibold">Bölüm Ekle</button></div>
-                                            <div class="flex items-center"><label class="w-24">Kategori Adı:</label><select class="flex-1 border-gray-300 py-1 rounded-sm text-xs"><option>Seçiniz</option></select><button class="ml-2 bg-gray-200 border border-gray-300 px-2 rounded-sm py-1 font-semibold">Kategori Ekle</button></div>
-                                            <div class="flex items-center"><label class="w-24">Açıklama:</label><input type="text" class="flex-1 border-gray-300 py-1 rounded-sm text-xs" /></div>
-                                        </div>
-                                        <div class="space-y-2">
-                                            <div class="flex items-center"><label class="w-24">Veriliş Tarihi:</label><input type="date" class="flex-1 border-gray-300 py-1 rounded-sm text-xs" /></div>
-                                            <div class="flex items-center"><label class="w-24">İade Tarihi:</label><input type="date" class="flex-1 border-gray-300 py-1 rounded-sm text-xs" /></div>
-                                        </div>
-                                    </div>
-                                    <div class="flex space-x-1 mt-2">
-                                        <button class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-yellow-500">+</button>
-                                        <button class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-gray-500">-</button>
-                                        <button class="w-6 h-6 bg-white border border-gray-300 rounded shadow-sm hover:bg-gray-50 font-bold text-gray-500">✓</button>
-                                    </div>
-                                </div>
-                                
-                                <div class="mt-auto border-t border-gray-200 pt-3">
-                                   <!-- Alt Tablolar Görseli (Mocked) -->
-                                   <div class="flex gap-2">
-                                        <button @click="activeSubTab='genel'" :class="activeSubTab==='genel' ? 'border-gray-300 bg-white shadow-sm' : 'text-blue-600 bg-transparent border-transparent'" class="border px-3 py-1 text-xs flex items-center">🧍 Genel</button>
-                                        <button @click="activeSubTab='ozluk_sub'" :class="activeSubTab==='ozluk_sub' ? 'border-gray-300 bg-white shadow-sm' : 'text-blue-600 bg-transparent border-transparent'" class="border px-3 py-1 text-xs flex items-center">🔍 Özlük</button>
-                                        <button @click="activeSubTab='not'" :class="activeSubTab==='not' ? 'border-gray-300 bg-white shadow-sm' : 'text-blue-600 bg-transparent border-transparent'" class="border px-3 py-1 text-xs flex items-center">📝 Not</button>
-                                        <button @click="activeSubTab='zimmet'" :class="activeSubTab==='zimmet' ? 'border-gray-300 bg-white shadow-sm' : 'text-blue-600 bg-transparent border-transparent'" class="border px-3 py-1 text-xs flex items-center">🍔 Zimmet</button>
-                                   </div>
-                                </div>
-                            </div>
-                            
-                            <!-- GİRİŞ ÇIKIŞ TAB -->
-                            <div v-if="activeTab==='giris_cikis'" class="text-sm h-full flex flex-col space-y-4">
-                                <div class="h-full overflow-y-auto border border-gray-300">
-                                    <table class="w-full text-xs text-left">
-                                        <thead class="bg-gray-100 sticky top-0">
-                                            <tr>
-                                                <th class="py-1 px-2 border-r border-b w-8">#</th>
-                                                <th class="py-1 px-2 border-r border-b">Kayıt Tarihi / Saati</th>
-                                                <th class="py-1 px-2 border-b">İşlem Tipi</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="(k, idx) in selectedPersonel.pdks_kayitlari || []" :key="k.id" class="border-b hover:bg-yellow-50">
-                                                <td class="py-1 px-2 border-r">{{ idx + 1 }}</td>
-                                                <td class="py-1 px-2 border-r">{{ k.kayit_tarihi }}</td>
-                                                <td class="py-1 px-2 font-bold" :class="k.islem_tipi === 'Giriş' ? 'text-green-600' : 'text-red-500'">{{ k.islem_tipi }}</td>
-                                            </tr>
-                                            <tr v-if="!(selectedPersonel.pdks_kayitlari && selectedPersonel.pdks_kayitlari.length)">
-                                                <td colspan="3" class="py-10 text-center text-gray-400">&lt;Gösterilecek Bilgi yok&gt;</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- İZİN TAB -->
-                            <div v-if="activeTab==='izin'" class="text-sm h-full flex flex-col space-y-4">
-                                <div class="h-full overflow-y-auto border border-gray-300">
-                                    <table class="w-full text-xs text-left">
-                                        <thead class="bg-gray-100 sticky top-0">
-                                            <tr>
-                                                <th class="py-1 px-2 border-r border-b">İzin Tipi</th>
-                                                <th class="py-1 px-2 border-r border-b">Tarih</th>
-                                                <th class="py-1 px-2 border-r border-b">Tatil Tipi</th>
-                                                <th class="py-1 px-2 border-r border-b">Başlangıç</th>
-                                                <th class="py-1 px-2 border-r border-b">Bitiş</th>
-                                                <th class="py-1 px-2 border-b">Açıklama</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="izin in selectedPersonel.izinler || []" :key="izin.id" class="border-b hover:bg-yellow-50">
-                                                <td class="py-1 px-2 border-r">{{ izin.izin_tipi }}</td>
-                                                <td class="py-1 px-2 border-r">{{ formatZimmetTarihi(izin.tarih) }}</td>
-                                                <td class="py-1 px-2 border-r">{{ izin.tatil_tipi }}</td>
-                                                <td class="py-1 px-2 border-r">{{ izin.giris_saati }}</td>
-                                                <td class="py-1 px-2 border-r">{{ izin.cikis_saati }}</td>
-                                                <td class="py-1 px-2">{{ izin.aciklama }}</td>
-                                            </tr>
-                                            <tr v-if="!(selectedPersonel.izinler && selectedPersonel.izinler.length)">
-                                                <td colspan="6" class="py-10 text-center text-gray-400">&lt;Gösterilecek Bilgi yok&gt;</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- AVANS TAB -->
-                            <div v-if="activeTab==='avans'" class="text-sm h-full flex flex-col space-y-4">
-                                <div class="h-full overflow-y-auto border border-gray-300">
-                                    <table class="w-full text-xs text-left">
-                                        <thead class="bg-gray-100 sticky top-0">
-                                            <tr>
-                                                <th class="py-1 px-2 border-r border-b">Tarih</th>
-                                                <th class="py-1 px-2 border-r border-b">Bordro Alanı</th>
-                                                <th class="py-1 px-2 border-r border-b">Tutar</th>
-                                                <th class="py-1 px-2 border-b">Açıklama</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="avans in selectedPersonel.avans_kesintiler || []" :key="avans.id" class="border-b hover:bg-yellow-50">
-                                                <td class="py-1 px-2 border-r">{{ formatZimmetTarihi(avans.tarih) }}</td>
-                                                <td class="py-1 px-2 border-r">{{ avans.bordro_alani }}</td>
-                                                <td class="py-1 px-2 border-r text-red-600 font-semibold">{{ avans.tutar }} ₺</td>
-                                                <td class="py-1 px-2">{{ avans.aciklama }}</td>
-                                            </tr>
-                                            <tr v-if="!(selectedPersonel.avans_kesintiler && selectedPersonel.avans_kesintiler.length)">
-                                                <td colspan="4" class="py-10 text-center text-gray-400">&lt;Gösterilecek Bilgi yok&gt;</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            
-                            <!-- PRIM TAB -->
-                            <div v-if="activeTab==='prim'" class="text-sm h-full flex flex-col space-y-4">
-                                <div class="h-full overflow-y-auto border border-gray-300">
-                                    <table class="w-full text-xs text-left">
-                                        <thead class="bg-gray-100 sticky top-0">
-                                            <tr>
-                                                <th class="py-1 px-2 border-r border-b">Tarih</th>
-                                                <th class="py-1 px-2 border-r border-b">Bordro Alanı</th>
-                                                <th class="py-1 px-2 border-r border-b">Tutar</th>
-                                                <th class="py-1 px-2 border-b">Açıklama</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr v-for="prim in selectedPersonel.prim_kazanclar || []" :key="prim.id" class="border-b hover:bg-yellow-50">
-                                                <td class="py-1 px-2 border-r">{{ formatZimmetTarihi(prim.tarih) }}</td>
-                                                <td class="py-1 px-2 border-r">{{ prim.bordro_alani }}</td>
-                                                <td class="py-1 px-2 border-r text-green-600 font-semibold">{{ prim.tutar }} ₺</td>
-                                                <td class="py-1 px-2">{{ prim.aciklama }}</td>
-                                            </tr>
-                                            <tr v-if="!(selectedPersonel.prim_kazanclar && selectedPersonel.prim_kazanclar.length)">
-                                                <td colspan="4" class="py-10 text-center text-gray-400">&lt;Gösterilecek Bilgi yok&gt;</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Panel Ayak Alanı -->
-                        <div class="bg-gray-100 p-2 border-t border-gray-300 flex justify-between items-center mt-auto">
-                            <div class="flex items-center">
-                                <input type="checkbox" id="one_month" class="mr-2 border-gray-300 rounded text-indigo-600 text-xs" />
-                                <label for="one_month" class="text-xs">Sadece bir ay öncesine kadar olan bilgileri görüntüle</label>
-                            </div>
-                            <div>
-                                <button class="bg-gray-200 hover:bg-gray-300 border border-gray-300 text-gray-700 text-xs py-1 px-4 ml-2">Silinen Personeller</button>
-                                <button v-if="activeTab==='ozluk'" @click="savePersonel" class="bg-blue-600 hover:bg-blue-700 text-white text-xs py-1 px-6 ml-2 font-bold focus:ring-2 rounded-sm outline-none shadow-sm">
-                                    {{ isSaving ? 'Kaydediliyor...' : 'Kaydet' }}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </Modal>
-
     </AuthenticatedLayout>
 </template>
+
+<style scoped>
+.tab-btn {
+    @apply px-3 py-1.5 text-xs font-medium border-b-2 border-transparent text-gray-600 hover:text-blue-700 hover:bg-blue-50 transition cursor-pointer;
+}
+.tab-active {
+    @apply !text-blue-700 !border-blue-600 bg-white font-bold;
+}
+.subtab-btn {
+    @apply px-3 py-1 text-[11px] border border-gray-300 rounded-sm bg-gray-50 text-gray-600 hover:bg-blue-50 cursor-pointer transition;
+}
+.subtab-active {
+    @apply !bg-blue-600 !text-white !border-blue-600;
+}
+.form-group {
+    @apply flex flex-col;
+}
+.form-group label {
+    @apply text-[10px] font-semibold text-gray-500 mb-0.5 uppercase tracking-wide;
+}
+.form-input {
+    @apply border-gray-300 rounded-sm py-1 px-2 text-xs focus:ring-blue-400 focus:border-blue-400;
+}
+.data-table {
+    @apply w-full text-xs border-collapse;
+}
+.data-table thead {
+    @apply bg-[#d0dcea] sticky top-0;
+}
+.data-table th {
+    @apply py-1.5 px-2 text-left border border-gray-400 font-bold text-gray-700;
+}
+.data-table td {
+    @apply py-1 px-2 border-r border-gray-200;
+}
+.data-table tbody tr {
+    @apply border-b border-gray-200 hover:bg-blue-50 transition-colors;
+}
+.win-btn {
+    @apply w-8 h-8 flex items-center justify-center bg-white border border-gray-400 rounded-sm hover:bg-gray-100 shadow-sm cursor-pointer transition;
+}
+</style>

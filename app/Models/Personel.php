@@ -52,6 +52,10 @@ class Personel extends Model
         'resim_yolu',
         'durum',
         'notlar',
+        'email',
+        'telefon',
+        'gec_kalma_bildirimi',
+        'dogum_tarihi',
     ];
 
     public function izinler()
