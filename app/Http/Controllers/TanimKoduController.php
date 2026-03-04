@@ -18,6 +18,7 @@ class TanimKoduController extends Controller
             'bolum' => ['baslik' => 'Bölüm Tanımlama', 'ikon' => 'folder'],
             'odeme' => ['baslik' => 'Ödeme Tanımlama', 'ikon' => 'cash'],
             'servis' => ['baslik' => 'Servis Tanımlama', 'ikon' => 'truck'],
+            'hesap_gurubu' => ['baslik' => 'Hesap Grubu Tanımlama', 'ikon' => 'tag'],
         ];
     }
 

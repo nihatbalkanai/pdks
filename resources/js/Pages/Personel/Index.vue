@@ -8,7 +8,12 @@ import axios from 'axios';
 const props = defineProps({
     personeller: Object,
     filtreler: Object,
+    tanimKodlari: Object,
+    aylikPuantajParametreleri: { type: Array, default: () => [] },
 });
+
+// Tanım kodları helper
+const getTanimSecenekleri = (tip) => props.tanimKodlari?.[tip] || [];
 
 const aramaAna = ref(props.filtreler?.arama || '');
 const localPersoneller = ref([...(props.personeller?.data || [])]);
@@ -77,6 +82,65 @@ const selectPersonel = async (personel) => {
     isLoading.value = false;
 };
 
+// --- OTOMATİK MAAŞ HESAPLAMA ---
+let isAutoCalculating = false;
+
+watch(() => selectedPersonel.value.aylik_ucret, (newVal) => {
+    if (isAutoCalculating) return;
+    if (!newVal) {
+        isAutoCalculating = true;
+        selectedPersonel.value.gunluk_ucret = '';
+        selectedPersonel.value.saat_1 = '';
+        isAutoCalculating = false;
+        return;
+    }
+    
+    // Varsayılan katsayılar
+    let aylikCalismaSaati = 225;
+    let gunLuku = 30; // standart ay 30 gün
+    
+    if (selectedPersonel.value.hesap_gurubu) {
+        const param = props.aylikPuantajParametreleri?.find(p => p.hesap_parametresi_adi === selectedPersonel.value.hesap_gurubu);
+        if (param) {
+            aylikCalismaSaati = param.aylik_calisma_saati || 225;
+            // Günlük saati bulup 30'a bölmek yerine 30 güne bölündüğü varsayılır
+            const gunlukSaat = param.gunluk_calisma_saati || 7.5;
+            gunLuku = aylikCalismaSaati / gunlukSaat;
+        }
+    }
+    
+    isAutoCalculating = true;
+    selectedPersonel.value.gunluk_ucret = (Number(newVal) / 30).toFixed(2);
+    selectedPersonel.value.saat_1 = (Number(newVal) / aylikCalismaSaati).toFixed(2);
+    isAutoCalculating = false;
+});
+
+watch(() => selectedPersonel.value.gunluk_ucret, (newVal) => {
+    if (isAutoCalculating) return;
+    if (!newVal) {
+        isAutoCalculating = true;
+        selectedPersonel.value.aylik_ucret = '';
+        selectedPersonel.value.saat_1 = '';
+        isAutoCalculating = false;
+        return;
+    }
+
+    let aylikCalismaSaati = 225;
+    
+    if (selectedPersonel.value.hesap_gurubu) {
+        const param = props.aylikPuantajParametreleri?.find(p => p.hesap_parametresi_adi === selectedPersonel.value.hesap_gurubu);
+        if (param) {
+            aylikCalismaSaati = param.aylik_calisma_saati || 225;
+        }
+    }
+    
+    isAutoCalculating = true;
+    const aylik = Number(newVal) * 30;
+    selectedPersonel.value.aylik_ucret = aylik.toFixed(2);
+    selectedPersonel.value.saat_1 = (aylik / aylikCalismaSaati).toFixed(2);
+    isAutoCalculating = false;
+});
+
 // Yeni personel
 const newPersonel = () => {
     selectedPersonel.value = JSON.parse(JSON.stringify(emptyPersonel));
@@ -88,18 +152,55 @@ const newPersonel = () => {
 const savePersonel = async () => {
     isSaving.value = true;
     try {
+        // Sadece form alanlarını gönder (ilişki verilerini hariç tut)
+        const formData = {
+            kart_no: selectedPersonel.value.kart_no || '',
+            ad: selectedPersonel.value.ad || '',
+            soyad: selectedPersonel.value.soyad || '',
+            sicil_no: selectedPersonel.value.sicil_no || '',
+            ssk_no: selectedPersonel.value.ssk_no || '',
+            unvan: selectedPersonel.value.unvan || '',
+            sirket: selectedPersonel.value.sirket || '',
+            bolum: selectedPersonel.value.bolum || '',
+            ozel_kod: selectedPersonel.value.ozel_kod || '',
+            departman: selectedPersonel.value.departman || '',
+            servis_kodu: selectedPersonel.value.servis_kodu || '',
+            hesap_gurubu: selectedPersonel.value.hesap_gurubu || '',
+            agi: selectedPersonel.value.agi || '',
+            aylik_ucret: selectedPersonel.value.aylik_ucret || null,
+            gunluk_ucret: selectedPersonel.value.gunluk_ucret || null,
+            saat_1: selectedPersonel.value.saat_1 || null,
+            saat_2: selectedPersonel.value.saat_2 || null,
+            saat_3: selectedPersonel.value.saat_3 || null,
+            giris_tarihi: selectedPersonel.value.giris_tarihi || null,
+            cikis_tarihi: selectedPersonel.value.cikis_tarihi || null,
+            durum: selectedPersonel.value.durum ?? true,
+            notlar: selectedPersonel.value.notlar || '',
+            email: selectedPersonel.value.email || '',
+            telefon: selectedPersonel.value.telefon || '',
+            gec_kalma_bildirimi: selectedPersonel.value.gec_kalma_bildirimi ?? false,
+            dogum_tarihi: selectedPersonel.value.dogum_tarihi || null,
+        };
+
         if (selectedPersonel.value.id) {
-            await axios.put(route('personeller.update', selectedPersonel.value.id), selectedPersonel.value);
+            const res = await axios.put(route('personeller.update', selectedPersonel.value.id), formData);
+            // Güncellenen veriyi local listeye yansıt
+            const idx = localPersoneller.value.findIndex(p => p.id === selectedPersonel.value.id);
+            if (idx !== -1 && res.data.personel) {
+                localPersoneller.value[idx] = { ...localPersoneller.value[idx], ...res.data.personel };
+            }
             Swal.fire({ title: 'Başarılı!', text: 'Personel güncellendi.', icon: 'success', timer: 1500 });
         } else {
-            const response = await axios.post(route('personeller.store'), selectedPersonel.value);
+            const response = await axios.post(route('personeller.store'), formData);
+            if (response.data.personel) {
+                localPersoneller.value.unshift(response.data.personel);
+                selectedPersonel.value = { ...selectedPersonel.value, ...response.data.personel };
+            }
             Swal.fire({ title: 'Başarılı!', text: 'Yeni personel kaydedildi.', icon: 'success', timer: 1500 });
-            selectedPersonel.value = response.data.personel;
         }
-        router.reload({ only: ['personeller'] });
-        setTimeout(() => { localPersoneller.value = [...props.personeller.data] }, 1000);
     } catch (error) {
-        const msg = error.response?.data?.message || 'Kaydetme işlemi başarısız oldu.';
+        const errors = error.response?.data?.errors;
+        const msg = errors ? Object.values(errors).flat().join('<br>') : (error.response?.data?.message || 'Kaydetme işlemi başarısız oldu.');
         Swal.fire('Hata!', msg, 'error');
     } finally {
         isSaving.value = false;
@@ -259,12 +360,48 @@ const uploadResim = async (event) => {
                                                 <div class="form-group"><label>Soyad</label><input v-model="selectedPersonel.soyad" class="form-input" /></div>
                                                 <div class="form-group"><label>SSK No</label><input v-model="selectedPersonel.ssk_no" class="form-input" /></div>
                                                 <div class="form-group"><label>Ünvan</label><input v-model="selectedPersonel.unvan" class="form-input" /></div>
-                                                <div class="form-group"><label>Şirket</label><input v-model="selectedPersonel.sirket" class="form-input" /></div>
-                                                <div class="form-group"><label>Bölüm</label><input v-model="selectedPersonel.bolum" class="form-input" /></div>
-                                                <div class="form-group"><label>Özel Kod</label><input v-model="selectedPersonel.ozel_kod" class="form-input" /></div>
-                                                <div class="form-group"><label>Departman</label><input v-model="selectedPersonel.departman" class="form-input" /></div>
-                                                <div class="form-group"><label>Servis Kodu</label><input v-model="selectedPersonel.servis_kodu" class="form-input" /></div>
-                                                <div class="form-group"><label>Hesap Grubu</label><input v-model="selectedPersonel.hesap_gurubu" class="form-input" /></div>
+                                                <div class="form-group">
+                                                    <label>Şirket</label>
+                                                    <select v-model="selectedPersonel.sirket" class="form-input">
+                                                        <option value="">Seçiniz</option>
+                                                        <option v-for="s in getTanimSecenekleri('sirket')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Bölüm</label>
+                                                    <select v-model="selectedPersonel.bolum" class="form-input">
+                                                        <option value="">Seçiniz</option>
+                                                        <option v-for="s in getTanimSecenekleri('bolum')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Özel Kod</label>
+                                                    <select v-model="selectedPersonel.ozel_kod" class="form-input">
+                                                        <option value="">Seçiniz</option>
+                                                        <option v-for="s in getTanimSecenekleri('odeme')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Departman</label>
+                                                    <select v-model="selectedPersonel.departman" class="form-input">
+                                                        <option value="">Seçiniz</option>
+                                                        <option v-for="s in getTanimSecenekleri('departman')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Servis Kodu</label>
+                                                    <select v-model="selectedPersonel.servis_kodu" class="form-input">
+                                                        <option value="">Seçiniz</option>
+                                                        <option v-for="s in getTanimSecenekleri('servis')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Hesap Grubu</label>
+                                                    <select v-model="selectedPersonel.hesap_gurubu" class="form-input">
+                                                        <option value="">Seçiniz</option>
+                                                        <option v-for="s in getTanimSecenekleri('hesap_gurubu')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
+                                                    </select>
+                                                </div>
                                                 <div class="form-group"><label>E-Posta</label><input v-model="selectedPersonel.email" type="email" class="form-input" placeholder="ornek@mail.com" /></div>
                                                 <div class="form-group"><label>Telefon</label><input v-model="selectedPersonel.telefon" class="form-input" placeholder="05XX XXX XX XX" /></div>
                                                 <div class="form-group"><label>Doğum Tarihi</label><input v-model="selectedPersonel.dogum_tarihi" type="date" class="form-input" /></div>

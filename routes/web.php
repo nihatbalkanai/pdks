@@ -23,7 +23,7 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Personel İşlemleri
-    Route::resource('personeller', \App\Http\Controllers\PersonelController::class)->middleware('rol.yetki:personel_islemleri');
+    Route::resource('personeller', \App\Http\Controllers\PersonelController::class)->parameters(['personeller' => 'personel'])->middleware('rol.yetki:personel_islemleri');
     Route::post('/personeller/{id}/resim', [\App\Http\Controllers\PersonelController::class, 'resimYukle'])->name('personeller.resim-yukle')->middleware('rol.yetki:personel_kartlari');
 
     // Cihaz İşlemleri
@@ -93,6 +93,68 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
         Route::post('/kodlar/{tip}', [\App\Http\Controllers\TanimKoduController::class, 'store'])->name('kodlar.store');
         Route::put('/kodlar/{tip}/{id}', [\App\Http\Controllers\TanimKoduController::class, 'update'])->name('kodlar.update');
         Route::delete('/kodlar/{tip}/{id}', [\App\Http\Controllers\TanimKoduController::class, 'destroy'])->name('kodlar.destroy');
+
+        // Vardiya Tanımları
+        Route::get('/vardiyalar', [\App\Http\Controllers\VardiyaController::class, 'index'])->name('vardiyalar.index');
+        Route::post('/vardiyalar', [\App\Http\Controllers\VardiyaController::class, 'store'])->name('vardiyalar.store');
+        Route::put('/vardiyalar/{vardiya}', [\App\Http\Controllers\VardiyaController::class, 'update'])->name('vardiyalar.update');
+        Route::delete('/vardiyalar/{vardiya}', [\App\Http\Controllers\VardiyaController::class, 'destroy'])->name('vardiyalar.destroy');
+
+        // Çalışma Planı
+        Route::get('/calisma-plani', [\App\Http\Controllers\CalismaPlaniController::class, 'index'])->name('calisma-plani.index');
+        Route::get('/calisma-plani/{grupId}/plan', [\App\Http\Controllers\CalismaPlaniController::class, 'planGetir'])->name('calisma-plani.plan-getir');
+        Route::post('/calisma-plani/{grupId}/satir', [\App\Http\Controllers\CalismaPlaniController::class, 'satirGuncelle'])->name('calisma-plani.satir');
+        Route::post('/calisma-plani/{grupId}/toplu-ata', [\App\Http\Controllers\CalismaPlaniController::class, 'topluAta'])->name('calisma-plani.toplu-ata');
+        Route::delete('/calisma-plani/{grupId}/temizle', [\App\Http\Controllers\CalismaPlaniController::class, 'planiTemizle'])->name('calisma-plani.temizle');
+        Route::post('/calisma-plani/{grupId}/ai-plan', [\App\Http\Controllers\CalismaPlaniController::class, 'aiPlanOlustur'])->name('calisma-plani.ai-plan');
+        Route::get('/puantaj-parametreleri', [\App\Http\Controllers\AylikPuantajParametresiController::class, 'index'])->name('puantaj-parametreleri.index');
+        Route::post('/puantaj-parametreleri', [\App\Http\Controllers\AylikPuantajParametresiController::class, 'store'])->name('puantaj-parametreleri.store');
+        Route::put('/puantaj-parametreleri/{id}', [\App\Http\Controllers\AylikPuantajParametresiController::class, 'update'])->name('puantaj-parametreleri.update');
+        Route::delete('/puantaj-parametreleri/{id}', [\App\Http\Controllers\AylikPuantajParametresiController::class, 'destroy'])->name('puantaj-parametreleri.destroy');
+
+        Route::get('/tatil-izin', [\App\Http\Controllers\TatilIzinController::class, 'index'])->name('tatil-izin.index');
+        Route::post('/tatil-izin/izin-turu', [\App\Http\Controllers\TatilIzinController::class, 'izinTuruStore'])->name('tatil-izin.izin-turu-store');
+        Route::put('/tatil-izin/izin-turu/{id}', [\App\Http\Controllers\TatilIzinController::class, 'izinTuruUpdate'])->name('tatil-izin.izin-turu-update');
+        Route::delete('/tatil-izin/izin-turu/{id}', [\App\Http\Controllers\TatilIzinController::class, 'izinTuruDestroy'])->name('tatil-izin.izin-turu-destroy');
+        Route::post('/tatil-izin/resmi-tatil', [\App\Http\Controllers\TatilIzinController::class, 'resmiTatilStore'])->name('tatil-izin.resmi-tatil-store');
+        Route::delete('/tatil-izin/resmi-tatil/{id}', [\App\Http\Controllers\TatilIzinController::class, 'resmiTatilDestroy'])->name('tatil-izin.resmi-tatil-destroy');
+        Route::post('/tatil-izin/ai-uret', [\App\Http\Controllers\TatilIzinController::class, 'aiTatilUret'])->name('tatil-izin.ai-uret');
+
+        // Günlük Puantaj Parametreleri
+        Route::get('/gunluk-puantaj', [\App\Http\Controllers\GunlukPuantajController::class, 'index'])->name('gunluk-puantaj.index');
+        Route::post('/gunluk-puantaj', [\App\Http\Controllers\GunlukPuantajController::class, 'store'])->name('gunluk-puantaj.store');
+        Route::put('/gunluk-puantaj/{id}', [\App\Http\Controllers\GunlukPuantajController::class, 'update'])->name('gunluk-puantaj.update');
+        Route::delete('/gunluk-puantaj/{id}', [\App\Http\Controllers\GunlukPuantajController::class, 'destroy'])->name('gunluk-puantaj.destroy');
+        Route::post('/gunluk-puantaj/{parametreId}/bordro', [\App\Http\Controllers\GunlukPuantajController::class, 'bordroStore'])->name('gunluk-puantaj.bordro-store');
+        Route::put('/gunluk-puantaj/bordro/{bordroId}', [\App\Http\Controllers\GunlukPuantajController::class, 'bordroUpdate'])->name('gunluk-puantaj.bordro-update');
+        Route::delete('/gunluk-puantaj/bordro/{bordroId}', [\App\Http\Controllers\GunlukPuantajController::class, 'bordroDestroy'])->name('gunluk-puantaj.bordro-destroy');
+
+        // Bordro Alanı Tanımlamaları
+        Route::get('/bordro-alanlari', [\App\Http\Controllers\BordroAlaniController::class, 'index'])->name('bordro-alanlari.index');
+        Route::post('/bordro-alanlari', [\App\Http\Controllers\BordroAlaniController::class, 'store'])->name('bordro-alanlari.store');
+        Route::put('/bordro-alanlari/{id}', [\App\Http\Controllers\BordroAlaniController::class, 'update'])->name('bordro-alanlari.update');
+        Route::delete('/bordro-alanlari/{id}', [\App\Http\Controllers\BordroAlaniController::class, 'destroy'])->name('bordro-alanlari.destroy');
+
+        // Personele Özel Çalışma Planları
+        Route::get('/personel-calisma-plan', [\App\Http\Controllers\PersonelCalismaPlanController::class, 'index'])->name('personel-calisma-plan.index');
+        Route::get('/personel-calisma-plan/{personelId}/plan', [\App\Http\Controllers\PersonelCalismaPlanController::class, 'planGetir'])->name('personel-calisma-plan.plan-getir');
+        Route::post('/personel-calisma-plan/{personelId}/gun', [\App\Http\Controllers\PersonelCalismaPlanController::class, 'gunGuncelle'])->name('personel-calisma-plan.gun-guncelle');
+        Route::post('/personel-calisma-plan/{personelId}/grup-kopyala', [\App\Http\Controllers\PersonelCalismaPlanController::class, 'grupPlanKopyala'])->name('personel-calisma-plan.grup-kopyala');
+        Route::post('/personel-calisma-plan/{personelId}/toplu-ata', [\App\Http\Controllers\PersonelCalismaPlanController::class, 'topluAta'])->name('personel-calisma-plan.toplu-ata');
+        Route::delete('/personel-calisma-plan/{personelId}/temizle', [\App\Http\Controllers\PersonelCalismaPlanController::class, 'temizle'])->name('personel-calisma-plan.temizle');
+
+        // Personel İzin Yönetimi
+        Route::get('/personel-izin', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'index'])->name('personel-izin.index');
+        Route::get('/personel-izin/{personelId}/izinler', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'izinGetir'])->name('personel-izin.izin-getir');
+        Route::post('/personel-izin', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'store'])->name('personel-izin.store');
+        Route::put('/personel-izin/{id}', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'update'])->name('personel-izin.update');
+        Route::delete('/personel-izin/{id}', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'destroy'])->name('personel-izin.destroy');
+        Route::post('/personel-izin/{id}/durum', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'durumGuncelle'])->name('personel-izin.durum');
+        Route::post('/personel-izin-hesapla', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'hesaplaIzinTarihi'])->name('personel-izin.hesapla');
+
+        Route::post('/calisma-gruplari', [\App\Http\Controllers\CalismaPlaniController::class, 'grupStore'])->name('calisma-gruplari.store');
+        Route::put('/calisma-gruplari/{id}', [\App\Http\Controllers\CalismaPlaniController::class, 'grupUpdate'])->name('calisma-gruplari.update');
+        Route::delete('/calisma-gruplari/{id}', [\App\Http\Controllers\CalismaPlaniController::class, 'grupDestroy'])->name('calisma-gruplari.destroy');
     });
 });
 

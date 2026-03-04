@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Personel;
+use App\Models\TanimKodu;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -30,9 +31,25 @@ class PersonelController extends Controller
             ->paginate(15)
             ->withQueryString(); // Filtrelerin sayfalama sırasında kaybolmaması için
 
+        $firma_id = Auth::user()->firma_id ?? 1;
+
+        // Tanım kodlarını getir
+        $tanimKodlari = TanimKodu::where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->orderBy('kod')
+            ->get()
+            ->groupBy('tip')
+            ->map(fn($items) => $items->map(fn($i) => ['kod' => $i->kod, 'aciklama' => $i->aciklama])->values());
+
+        $aylikPuantajParametreleri = \App\Models\AylikPuantajParametresi::where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->get();
+
         return Inertia::render('Personel/Index', [
             'personeller' => $personeller,
             'filtreler' => $request->only(['arama']),
+            'tanimKodlari' => $tanimKodlari,
+            'aylikPuantajParametreleri' => $aylikPuantajParametreleri,
         ]);
     }
 
@@ -131,6 +148,7 @@ class PersonelController extends Controller
         $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
 
         $personel->update($validated);
+        $personel->refresh();
 
         return response()->json(['success' => true, 'personel' => $personel]);
     }
