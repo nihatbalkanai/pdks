@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -50,7 +50,7 @@ const izinGetir = async () => {
 
 watch([seciliPersonelId, yil], () => izinGetir());
 
-const form = useForm({
+const form = reactive({
     id: null,
     personel_id: null,
     izin_turu_id: '',
@@ -65,7 +65,7 @@ const form = useForm({
 });
 
 const yeniIzin = () => {
-    form.reset();
+    // form reset (reactive)
     form.id = null;
     form.personel_id = seciliPersonelId.value;
     form.tarih = new Date().toISOString().split('T')[0];
@@ -91,21 +91,32 @@ const duzenle = (izin) => {
     modalAcik.value = true;
 };
 
-const kaydet = () => {
-    if (form.id) {
-        form.put(route('tanim.personel-izin.update', form.id), {
-            onSuccess: () => { modalAcik.value = false; izinGetir(); Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1500}); }
-        });
-    } else {
-        form.post(route('tanim.personel-izin.store'), {
-            onSuccess: () => { modalAcik.value = false; izinGetir(); Swal.fire({toast:true, position:'top-end', icon:'success', title:'Kaydedildi', showConfirmButton:false, timer:1500}); }
-        });
+const kaydet = async () => {
+    try {
+        if (form.id) {
+            await axios.put(route('tanim.personel-izin.update', form.id), { ...form });
+        } else {
+            await axios.post(route('tanim.personel-izin.store'), { ...form });
+        }
+        modalAcik.value = false;
+        izinGetir();
+        Swal.fire({toast:true, position:'top-end', icon:'success', title: form.id ? 'Güncellendi' : 'Kaydedildi', showConfirmButton:false, timer:1200});
+    } catch(e) {
+        Swal.fire('Hata', e.response?.data?.message || 'İşlem başarısız', 'error');
     }
 };
 
 const sil = (id) => {
-    Swal.fire({title:'Emin misiniz?', icon:'warning', showCancelButton:true, confirmButtonText:'Evet, Sil'}).then((r) => {
-        if(r.isConfirmed) router.delete(route('tanim.personel-izin.destroy', id), { onSuccess: () => izinGetir() });
+    Swal.fire({title:'Emin misiniz?', icon:'warning', showCancelButton:true, confirmButtonText:'Evet, Sil'}).then(async (r) => {
+        if (r.isConfirmed) {
+            try {
+                await axios.delete(route('tanim.personel-izin.destroy', id));
+                izinGetir();
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) {
+                Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error');
+            }
+        }
     });
 };
 

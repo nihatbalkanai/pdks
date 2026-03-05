@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
+import axios from 'axios';
 import Modal from '@/Components/Modal.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import TextInput from '@/Components/TextInput.vue';
@@ -15,14 +16,14 @@ const isModalOpen = ref(false);
 const isEditing = ref(false);
 const editingId = ref(null);
 
-const form = useForm({
+const form = reactive({
     seri_no: '',
     cihaz_modeli: '',
 });
 
 const openCreateModal = () => {
     isEditing.value = false;
-    form.reset();
+    // form reset (reactive)
     form.clearErrors();
     isModalOpen.value = true;
 };
@@ -42,15 +43,13 @@ const submitForm = () => {
             onSuccess: () => isModalOpen.value = false
         });
     } else {
-        form.post(route('cihazlar.store'), {
-            onSuccess: () => isModalOpen.value = false
-        });
+        axios.post(route('cihazlar.store'), { ...form }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
     }
 };
 
 const deleteCihaz = (cihaz) => {
     if (confirm('Bu cihazı silmek istediğinize emin misiniz?')) {
-        form.delete(route('cihazlar.destroy', cihaz.id));
+        axios.delete(route('cihazlar.destroy', cihaz.id)).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'));
     }
 };
 
@@ -156,7 +155,7 @@ const formatDate = (dateString) => {
                         <button type="button" @click="isModalOpen = false" class="text-gray-600 hover:text-gray-900 px-4 py-2 mx-2 border rounded bg-white transition">
                             İptal
                         </button>
-                        <button type="submit" :disabled="form.processing" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow transition disabled:opacity-50">
+                        <button type="submit" :disabled="false" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow transition disabled:opacity-50">
                             Kaydet
                         </button>
                     </div>

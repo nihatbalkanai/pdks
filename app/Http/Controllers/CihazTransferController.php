@@ -46,6 +46,6 @@ class CihazTransferController extends Controller
     public function deleteHatali()
     {
         PdksKaydi::withoutGlobalScopes()->whereNull('personel_id')->delete();
-        return back()->with('success', 'Tüm hatalı kayıtlar silindi.');
+        return response()->json(['success' => true, 'message' => 'Tüm hatalı kayıtlar silindi.']);
     }
 }

@@ -1,25 +1,23 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router, usePage } from '@inertiajs/vue3';
+import { Head, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({ kullanicilar: Array, roller: Object, yetkiMatrisi: Object, yetkiEtiketleri: Object });
 const page = usePage();
 
-const activeTab = ref('kullanicilar'); // 'kullanicilar' or 'matris'
+const liste = ref([...(props.kullanicilar || [])]);
+const activeTab = ref('kullanicilar');
 const showForm = ref(false);
 const editMode = ref(false);
 const editId = ref(null);
 const showPassword = ref(false);
 const search = ref('');
+const yukleniyor = ref(false);
 
-const form = useForm({
-    ad_soyad: '',
-    eposta: '',
-    sifre: '',
-    rol: 'kullanici',
-});
+const form = reactive({ ad_soyad: '', eposta: '', sifre: '', rol: 'kullanici' });
 
 const rolRenkleri = {
     admin: 'bg-red-100 text-red-700 border-red-300',
@@ -38,16 +36,15 @@ const rolBaslikRenkleri = {
 };
 
 const filtered = computed(() => {
-    if (!search.value) return props.kullanicilar;
+    if (!search.value) return liste.value;
     const q = search.value.toLowerCase();
-    return props.kullanicilar.filter(k =>
+    return liste.value.filter(k =>
         k.ad_soyad.toLowerCase().includes(q) ||
         k.eposta.toLowerCase().includes(q) ||
         (props.roller[k.rol] || k.rol).toLowerCase().includes(q)
     );
 });
 
-// Yetki anahtarlarını grupla
 const yetkiGruplari = computed(() => {
     const keys = Object.keys(props.yetkiEtiketleri || {});
     const gruplar = [
@@ -64,7 +61,7 @@ const yetkiGruplari = computed(() => {
 const rolKeys = computed(() => Object.keys(props.roller || {}));
 
 const resetForm = () => {
-    form.reset();
+    Object.assign(form, { ad_soyad: '', eposta: '', sifre: '', rol: 'kullanici' });
     editMode.value = false;
     editId.value = null;
     showPassword.value = false;
@@ -73,54 +70,51 @@ const resetForm = () => {
 const openNew = () => { resetForm(); showForm.value = true; activeTab.value = 'kullanicilar'; };
 
 const editKullanici = (k) => {
-    form.ad_soyad = k.ad_soyad;
-    form.eposta = k.eposta;
-    form.sifre = '';
-    form.rol = k.rol;
+    Object.assign(form, { ad_soyad: k.ad_soyad, eposta: k.eposta, sifre: '', rol: k.rol });
     editMode.value = true;
     editId.value = k.id;
     showForm.value = true;
     activeTab.value = 'kullanicilar';
 };
 
-const save = () => {
-    if (!form.ad_soyad || !form.eposta) {
-        Swal.fire('Uyarı', 'Ad soyad ve e-posta zorunludur.', 'warning');
-        return;
+const save = async () => {
+    if (!form.ad_soyad || !form.eposta) { Swal.fire('Uyarı', 'Ad soyad ve e-posta zorunludur.', 'warning'); return; }
+    if (!editMode.value && !form.sifre) { Swal.fire('Uyarı', 'Yeni kullanıcı için şifre zorunludur.', 'warning'); return; }
+    yukleniyor.value = true;
+    try {
+        if (editMode.value) {
+            const res = await axios.put(route('tanim.kullanicilar.update', editId.value), { ...form });
+            const idx = liste.value.findIndex(x => x.id === editId.value);
+            if (idx >= 0) liste.value[idx] = { ...liste.value[idx], ...res.data.item };
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1200});
+        } else {
+            const res = await axios.post(route('tanim.kullanicilar.store'), { ...form });
+            liste.value.push(res.data.item);
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Oluşturuldu', showConfirmButton:false, timer:1200});
+        }
+        showForm.value = false;
+        resetForm();
+    } catch(e) {
+        const msg = e.response?.data?.errors ? Object.values(e.response.data.errors).flat().join('<br>') : (e.response?.data?.message || 'Hata oluştu');
+        Swal.fire('Hata', msg, 'error');
     }
-    if (!editMode.value && !form.sifre) {
-        Swal.fire('Uyarı', 'Yeni kullanıcı için şifre zorunludur.', 'warning');
-        return;
-    }
-
-    if (editMode.value) {
-        form.put(route('tanim.kullanicilar.update', editId.value), {
-            onSuccess: () => { showForm.value = false; resetForm(); Swal.fire('Başarılı!', 'Kullanıcı güncellendi.', 'success'); },
-            onError: (errors) => { Swal.fire('Hata', Object.values(errors).flat().join('<br>'), 'error'); },
-        });
-    } else {
-        form.post(route('tanim.kullanicilar.store'), {
-            onSuccess: () => { showForm.value = false; resetForm(); Swal.fire('Başarılı!', 'Kullanıcı oluşturuldu.', 'success'); },
-            onError: (errors) => { Swal.fire('Hata', Object.values(errors).flat().join('<br>'), 'error'); },
-        });
-    }
+    yukleniyor.value = false;
 };
 
 const sil = (k) => {
-    if (k.id === page.props.auth?.user?.id) {
-        Swal.fire('Uyarı', 'Kendi hesabınızı silemezsiniz.', 'warning');
-        return;
-    }
+    if (k.id === page.props.auth?.user?.id) { Swal.fire('Uyarı', 'Kendi hesabınızı silemezsiniz.', 'warning'); return; }
     Swal.fire({
         title: 'Kullanıcıyı Sil',
         html: `<b>${k.ad_soyad}</b> kullanıcısı silinecek. Emin misiniz?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Sil',
-        cancelButtonText: 'İptal',
-    }).then(r => {
-        if (r.isConfirmed) router.delete(route('tanim.kullanicilar.destroy', k.id));
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sil', cancelButtonText: 'İptal',
+    }).then(async r => {
+        if (r.isConfirmed) {
+            try {
+                await axios.delete(route('tanim.kullanicilar.destroy', k.id));
+                liste.value = liste.value.filter(x => x.id !== k.id);
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) { Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'); }
+        }
     });
 };
 </script>
@@ -193,7 +187,7 @@ const sil = (k) => {
                         </div>
                     </div>
                     <div class="flex gap-2 mt-3">
-                        <button @click="save" :disabled="form.processing" class="bg-green-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
+                        <button @click="save" :disabled="yukleniyor" class="bg-green-600 text-white px-4 py-1.5 rounded text-xs font-semibold hover:bg-green-700 disabled:opacity-50">
                             {{ editMode ? 'Güncelle' : 'Kaydet' }}
                         </button>
                         <button @click="showForm = false; resetForm()" class="bg-gray-300 text-gray-700 px-4 py-1.5 rounded text-xs hover:bg-gray-400">İptal</button>

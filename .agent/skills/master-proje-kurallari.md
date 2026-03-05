@@ -53,7 +53,7 @@ Sen bu projenin Baş Mimarı (Lead Architect) rolündesin. 10.000 firmaya hizmet
 ## 10. Vue 3 ve Inertia.js Standartları (Vanilla JS / jQuery Yasağı)
 - **Framework Kullanımı:** DOM manipülasyonu, AJAX istekleri ve olay dinleyicileri (event listeners) için kesinlikle Vanilla JS veya jQuery KULLANILMAMALIDIR. 
 - **Veri Akışı:** Tüm işlemler Vue 3 Composition API (`ref`, `reactive`, `computed`) ve Inertia.js üzerinden sağlanmalıdır.
-- **AJAX İstekleri:** Sadece çok nadir ve özel durumlarda (Inertia dışında bir API'ye istek atılacaksa) `axios` kullanılabilir, tutarlı bir state yönetimi sağlanmalıdır.
+- **AJAX İstekleri:** Tüm form submit, CRUD (ekleme/güncelleme/silme) işlemleri `axios` ile yapılmalıdır. Inertia'nın `useForm` kullanılmamalıdır. Detaylar için aşağıdaki **AJAX Kuralları** bölümüne bakınız.
 
 ## 11. Dosya ve Dizin Düzeni
 - **Service Layer:** Controller'lar 200 satırı geçmemelidir. Karmaşık iş mantığı `app/Services` klasörü altındaki servis sınıflarına taşınmalıdır.
@@ -95,3 +95,51 @@ Bu proje, 10.000 firma ölçeğinde çalışan, yüksek trafikli bir SaaS platfo
 - **Hız Sınırlama:** API uç noktalarında `Rate Limiting` uygulanarak sistemin DDOS veya hatalı cihaz isteklerine karşı korunması sağlanmalıdır.
 
 **Alertler Uyarılar:** uyarılar ve bildirimler için swettalert kullanılacak.
+
+---
+
+## 13. AJAX Kuralları (Sayfa Yenilenmeden İşlem)
+
+> **ÖNEMLİ:** Bu projede tüm CRUD (ekleme, güncelleme, silme) işlemleri **sayfa yenilenmeden** çalışmalıdır.
+> Eğer yeni oluşturulan veya düzenlenen bir sayfada Inertia `useForm` + sayfa yenilemeli yaklaşım tespit edilirse, **derhal axios + yerel state yaklaşımına çevrilmelidir.**
+
+### Frontend Kuralları:
+- **useForm YASAK:** Inertia'nın `useForm().post/put/delete()` kullanılmamalıdır. Bunun yerine `axios.post/put/delete()` kullanılmalıdır.
+- **reactive form:** Form verileri `reactive({...})` ile tanımlanmalıdır (`useForm` yerine).
+- **Yerel liste:** Sayfa verileri `ref([...props.liste])` ile yerel bir array'e kopyalanmalı, CRUD sonrası bu array güncellenerek UI anlık değişmelidir.
+- **axios import:** Her Vue dosyasında `import axios from 'axios';` olmalıdır.
+- **Bildirimler:** İşlem sonrası `Swal.fire({ toast: true, ... })` ile kullanıcıya bilgi verilmelidir.
+- **Hata yakalama:** Her axios çağrısı `try/catch` veya `.catch()` ile sarılmalı, hata mesajı `Swal.fire('Hata', ...)` ile gösterilmelidir.
+
+### Backend Kuralları:
+- **JSON Response:** Controller'lar asla `redirect()->back()` veya `redirect()->route()` döndürmemelidir. Bunun yerine `response()->json([...])` döndürmelidir.
+- **Başarı yanıtı:** `return response()->json(['success' => true, 'item' => $kayit]);` — yeni/güncel kayıt döndürülmeli.
+- **Silme yanıtı:** `return response()->json(['success' => true]);`
+- **Hata yanıtı:** `return response()->json(['success' => false, 'message' => 'Hata mesajı'], 422);`
+
+### Örnek Vue Pattern:
+```javascript
+// ❌ YANLIŞ (eski yöntem — sayfa yenilenir)
+const form = useForm({ ad: '', soyad: '' });
+form.post(route('personel.store'), {
+    onSuccess: () => { /* sayfa zaten yenilendi */ }
+});
+
+// ✅ DOĞRU (yeni yöntem — sayfa yenilenmez)
+const form = reactive({ ad: '', soyad: '' });
+const liste = ref([...props.personeller]);
+const kaydet = async () => {
+    try {
+        const res = await axios.post(route('personel.store'), { ...form });
+        liste.value.push(res.data.item); // UI anlık güncellenir
+        Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Eklendi', showConfirmButton: false, timer: 1200 });
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error');
+    }
+};
+```
+
+### İstisna:
+- **Sayfa navigasyonu** (router.visit, Link) Inertia ile kalabilir — bunlar zaten AJAX değildir, sayfa geçişidir.
+- **Auth sayfaları** (Login, Register, ForgotPassword vb.) Inertia useForm ile kalabilir — bunlar tek seferlik formlardır.
+- **Filtre/arama** işlemleri `router.get()` ile yapılabilir (`preserveState: true` ile).

@@ -45,7 +45,7 @@ class GunlukPuantajController extends Controller
 
         $parametre = GunlukPuantajParametresi::create($validated);
 
-        return redirect()->back()->with('success', 'Günlük puantaj parametresi eklendi.');
+        return response()->json(['success' => true, 'item' => $parametre->load('bordroAlanlari')]);
     }
 
     public function update(Request $request, $id)
@@ -69,7 +69,7 @@ class GunlukPuantajController extends Controller
         $parametre = GunlukPuantajParametresi::where('firma_id', $firma_id)->findOrFail($id);
         $parametre->update($validated);
 
-        return redirect()->back()->with('success', 'Parametre güncellendi.');
+        return response()->json(['success' => true, 'item' => $parametre->fresh()->load('bordroAlanlari')]);
     }
 
     public function destroy($id)
@@ -78,7 +78,7 @@ class GunlukPuantajController extends Controller
         $parametre = GunlukPuantajParametresi::where('firma_id', $firma_id)->findOrFail($id);
         $parametre->delete();
 
-        return redirect()->back()->with('success', 'Parametre silindi.');
+        return response()->json(['success' => true]);
     }
 
     // --- BORDRO ALANLARI ---
@@ -101,9 +101,9 @@ class GunlukPuantajController extends Controller
         GunlukPuantajParametresi::where('firma_id', $firma_id)->findOrFail($parametreId);
 
         $validated['gunluk_puantaj_id'] = $parametreId;
-        GunlukPuantajBordroAlani::create($validated);
+        $bordro = GunlukPuantajBordroAlani::create($validated);
 
-        return redirect()->back()->with('success', 'Bordro alanı eklendi.');
+        return response()->json(['success' => true, 'item' => $bordro]);
     }
 
     public function bordroUpdate(Request $request, $bordroId)
@@ -122,7 +122,7 @@ class GunlukPuantajController extends Controller
         $bordro = GunlukPuantajBordroAlani::findOrFail($bordroId);
         $bordro->update($validated);
 
-        return redirect()->back()->with('success', 'Bordro alanı güncellendi.');
+        return response()->json(['success' => true, 'item' => $bordro->fresh()]);
     }
 
     public function bordroDestroy($bordroId)
@@ -130,6 +130,6 @@ class GunlukPuantajController extends Controller
         $bordro = GunlukPuantajBordroAlani::findOrFail($bordroId);
         $bordro->delete();
 
-        return redirect()->back()->with('success', 'Bordro alanı silindi.');
+        return response()->json(['success' => true]);
     }
 }

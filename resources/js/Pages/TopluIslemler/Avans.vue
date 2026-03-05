@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({ personeller: Array });
@@ -11,7 +12,7 @@ const tutarTipi = ref('miktar');
 const progress = ref(0);
 const isProcessing = ref(false);
 
-const form = useForm({
+const form = reactive({
     personel_ids: [],
     tarih: new Date().toISOString().slice(0, 10),
     tip: 'miktar',
@@ -35,10 +36,7 @@ const submit = () => {
     form.tip = tutarTipi.value;
     isProcessing.value = true; progress.value = 0;
     const iv = setInterval(() => { progress.value += 10; if (progress.value >= 90) clearInterval(iv); }, 100);
-    form.post(route('toplu-islemler.avans.uygula'), {
-        onSuccess: () => { clearInterval(iv); progress.value = 100; isProcessing.value = false; Swal.fire('Başarılı!', `${selectedIds.value.length} personele avans tanımlandı.`, 'success'); },
-        onError: () => { clearInterval(iv); isProcessing.value = false; Swal.fire('Hata', 'İşlem sırasında hata oluştu.', 'error'); }
-    });
+    axios.post(route('toplu-islemler.avans.uygula'), { ...form }).then(() => { clearInterval(iv); progress.value = 100; isProcessing.value = false; Swal.fire('Başarılı!', `${selectedIds.value.length} personele avans tanımlandı.`, 'success'); }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
 };
 </script>
 

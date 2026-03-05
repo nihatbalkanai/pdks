@@ -24,6 +24,10 @@ class PersonelAvansKesinti extends Model
         'tutar',
         'aciklama',
         'bordro_alani',
+        'taksit_grup_id',
+        'taksit_no',
+        'toplam_taksit',
+        'toplam_tutar',
     ];
 
     public function personel()

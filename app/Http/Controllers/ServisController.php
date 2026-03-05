@@ -37,7 +37,7 @@ class ServisController extends Controller
 
         \App\Models\Servis::create($validated);
 
-        return redirect()->back()->with('success', 'Servis başarıyla eklendi.');
+        return response()->json(['success' => true, 'message' => 'Servis başarıyla eklendi.']);
     }
 
     public function update(\Illuminate\Http\Request $request, \App\Models\Servis $servi)
@@ -55,13 +55,13 @@ class ServisController extends Controller
 
         $servi->update($validated);
 
-        return redirect()->back()->with('success', 'Servis güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Servis güncellendi.']);
     }
 
     public function destroy(\App\Models\Servis $servi)
     {
         \Illuminate\Support\Facades\Gate::authorize('firma_tam_yetki');
         $servi->delete();
-        return redirect()->back()->with('success', 'Servis silindi.');
+        return response()->json(['success' => true, 'message' => 'Servis silindi.']);
     }
 }

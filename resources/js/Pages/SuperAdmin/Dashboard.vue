@@ -1,6 +1,7 @@
 <script setup>
-import { Head, useForm, router } from '@inertiajs/vue3';
-import { ref, computed } from 'vue';
+import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
+import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import Modal from '@/Components/Modal.vue';
 import { Chart as ChartJS, registerables } from 'chart.js';
@@ -46,7 +47,7 @@ const chartOptions = {
 // Firma Yönetimi Modalı
 const isModalOpen = ref(false);
 const editingFirma = ref(null);
-const form = useForm({
+const form = reactive({
     abonelik_bitis_tarihi: '',
     paket_tipi: 'Ücretsiz',
     durum: true
@@ -71,7 +72,7 @@ const saveAbonelik = () => {
 // Admin Yetki Modalı
 const isAdminModalOpen = ref(false);
 const editingAdmin = ref(null);
-const adminForm = useForm({
+const adminForm = reactive({
     yetkiler: []
 });
 
@@ -294,7 +295,7 @@ const saveAdminYetki = () => {
 
                     <div class="mt-6 flex justify-end">
                         <button type="button" @click="isModalOpen = false" class="mr-3 bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">İptal</button>
-                        <button type="submit" :disabled="form.processing" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Değişiklikleri Kaydet</button>
+                        <button type="submit" :disabled="false" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">Değişiklikleri Kaydet</button>
                     </div>
                 </form>
             </div>

@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({
@@ -67,7 +68,7 @@ const saveAll = () => {
     if (editableKayitlar.value.length === 0) {
         Swal.fire('Uyarı', 'Kaydedilecek kayıt yok.', 'warning'); return;
     }
-    const form = useForm({
+    const form = reactive({
         tarih: tarih.value,
         kayitlar: editableKayitlar.value.map(k => ({
             personel_id: k.personel_id,
@@ -75,10 +76,7 @@ const saveAll = () => {
             cikis_saati: k.cikis_saati || null,
         })),
     });
-    form.post(route('toplu-islemler.giris-cikis-duzenleme.kaydet'), {
-        onSuccess: () => Swal.fire('Başarılı!', 'Giriş-çıkış kayıtları güncellendi.', 'success'),
-        onError: () => Swal.fire('Hata', 'Kaydetme işlemi başarısız.', 'error'),
-    });
+    axios.post(route('toplu-islemler.giris-cikis-duzenleme.kaydet'), { ...form }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
 };
 
 // Tarih aralığı sil
@@ -90,7 +88,7 @@ const deleteTarih = () => {
         confirmButtonColor: '#d33', confirmButtonText: 'Evet, Sil!', cancelButtonText: 'İptal'
     }).then((result) => {
         if (result.isConfirmed) {
-            router.delete(route('toplu-islemler.giris-cikis-duzenleme.tarih-sil'), {
+            axios.delete(route('toplu-islemler.giris-cikis-duzenleme.tarih-sil')).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'), {
                 data: { tarih: tarih.value },
                 onSuccess: () => { editableKayitlar.value = []; Swal.fire('Silindi!', 'Tarih aralığındaki kayıtlar silindi.', 'success'); }
             });

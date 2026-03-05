@@ -1,147 +1,151 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({
     izinTurleri: Array,
-    resmiTatiller: Object, // Yıla göre obj { 2026: [...], 2025: [...] }
+    resmiTatiller: Object,
 });
 
-const activeTab = ref('izin'); // izin, resmi
+// Yerel reactive listeler — sayfa yenilenmeden güncellenir
+const izinListesi = ref([...(props.izinTurleri || [])]);
+const tatilListesi = ref({ ...(props.resmiTatiller || {}) });
+
+const activeTab = ref('izin');
 const currentYear = ref(new Date().getFullYear());
 const isAiLoading = ref(false);
+const yukleniyor = ref(false);
 
-// İzin Türleri Form
-const izinForm = useForm({
-    id: null,
-    ad: '',
-    ucret_kesintisi_yapilacak_mi: false,
-    yillik_izinden_duser_mi: false,
-    aktif_mi: true,
-});
-const izinModalAcik = ref(false);
+// --- İZİN TÜRLERİ ---
+const izinModal = reactive({ acik: false, id: null, ad: '', ucret_kesintisi_yapilacak_mi: false, yillik_izinden_duser_mi: false, aktif_mi: true, errors: {} });
 
 const openIzinModal = (item = null) => {
-    if (item) {
-        izinForm.id = item.id;
-        izinForm.ad = item.ad;
-        izinForm.ucret_kesintisi_yapilacak_mi = !!item.ucret_kesintisi_yapilacak_mi;
-        izinForm.yillik_izinden_duser_mi = !!item.yillik_izinden_duser_mi;
-        izinForm.aktif_mi = !!item.aktif_mi;
-    } else {
-        izinForm.reset();
-        izinForm.id = null;
-        izinForm.aktif_mi = true;
-    }
-    izinModalAcik.value = true;
+    Object.assign(izinModal, { acik: true, errors: {},
+        id: item?.id || null,
+        ad: item?.ad || '',
+        ucret_kesintisi_yapilacak_mi: !!item?.ucret_kesintisi_yapilacak_mi,
+        yillik_izinden_duser_mi: !!item?.yillik_izinden_duser_mi,
+        aktif_mi: item ? !!item.aktif_mi : true,
+    });
 };
 
-const saveIzin = () => {
-    if (izinForm.id) {
-        izinForm.put(route('tanim.tatil-izin.izin-turu-update', izinForm.id), {
-            onSuccess: () => { izinModalAcik.value = false; Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1500}); }
-        });
-    } else {
-        izinForm.post(route('tanim.tatil-izin.izin-turu-store'), {
-            onSuccess: () => { izinModalAcik.value = false; Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1500}); }
-        });
+const saveIzin = async () => {
+    if (!izinModal.ad.trim()) { izinModal.errors = { ad: 'İzin adı zorunludur.' }; return; }
+    yukleniyor.value = true;
+    try {
+        const payload = { ad: izinModal.ad, ucret_kesintisi_yapilacak_mi: izinModal.ucret_kesintisi_yapilacak_mi, yillik_izinden_duser_mi: izinModal.yillik_izinden_duser_mi, aktif_mi: izinModal.aktif_mi };
+        if (izinModal.id) {
+            const res = await axios.put(route('tanim.tatil-izin.izin-turu-update', izinModal.id), payload);
+            const idx = izinListesi.value.findIndex(x => x.id === izinModal.id);
+            if (idx >= 0) izinListesi.value[idx] = res.data.item;
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1400});
+        } else {
+            const res = await axios.post(route('tanim.tatil-izin.izin-turu-store'), payload);
+            izinListesi.value.push(res.data.item);
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1400});
+        }
+        izinModal.acik = false;
+    } catch(e) {
+        izinModal.errors = e.response?.data?.errors || {};
+        if (e.response?.data?.message) Swal.fire('Hata', e.response.data.message, 'error');
     }
+    yukleniyor.value = false;
 };
 
 const deleteIzin = (id) => {
-    Swal.fire({title: 'Emin misiniz?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Evet, Sil'}).then((res) => {
-        if(res.isConfirmed) {
-            router.delete(route('tanim.tatil-izin.izin-turu-destroy', id));
+    Swal.fire({title: 'Emin misiniz?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Evet, Sil', cancelButtonText: 'İptal'}).then(async (res) => {
+        if (res.isConfirmed) {
+            try {
+                await axios.delete(route('tanim.tatil-izin.izin-turu-destroy', id));
+                izinListesi.value = izinListesi.value.filter(x => x.id !== id);
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) { Swal.fire('Hata', 'Silinemedi', 'error'); }
         }
     });
 };
 
-// Resmi Tatil Form
-const tatilForm = useForm({
-    id: null,
-    tarih: '',
-    ad: '',
-    tur: 'Resmi Tatil',
-    yarim_gun_mu: false,
-});
-const tatilModalAcik = ref(false);
+// --- RESMİ TATİLLER ---
+const tatilModal = reactive({ acik: false, id: null, tarih: '', ad: '', tur: 'Resmi Tatil', yarim_gun_mu: false, errors: {} });
 
 const openTatilModal = (item = null) => {
-    if (item) {
-        tatilForm.id = item.id;
-        tatilForm.tarih = item.tarih ? item.tarih.substring(0, 10) : '';
-        tatilForm.ad = item.ad;
-        tatilForm.tur = item.tur || 'Resmi Tatil';
-        tatilForm.yarim_gun_mu = !!item.yarim_gun_mu;
-    } else {
-        tatilForm.reset();
-        tatilForm.id = null;
-        tatilForm.tur = 'Resmi Tatil';
-        // Yeni eklerken default olarak seçili yılın 1 ocağını göster(yada bugünü)
-        const date = new Date(currentYear.value, 0, 1);
-        tatilForm.tarih = date.toISOString().split('T')[0];
-    }
-    tatilModalAcik.value = true;
+    const defaultTarih = new Date(currentYear.value, 0, 1).toISOString().split('T')[0];
+    Object.assign(tatilModal, { acik: true, errors: {},
+        id: item?.id || null,
+        tarih: item?.tarih ? item.tarih.substring(0, 10) : defaultTarih,
+        ad: item?.ad || '',
+        tur: item?.tur || 'Resmi Tatil',
+        yarim_gun_mu: !!item?.yarim_gun_mu,
+    });
 };
 
-const saveTatil = () => {
-    tatilForm.post(route('tanim.tatil-izin.resmi-tatil-store'), {
-        onSuccess: () => { tatilModalAcik.value = false; Swal.fire({toast:true, position:'top-end', icon:'success', title:'Kaydedildi', showConfirmButton:false, timer:1500}); }
-    });
+const saveTatil = async () => {
+    if (!tatilModal.tarih || !tatilModal.ad.trim()) { tatilModal.errors = { ad: 'Tarih ve ad zorunludur.' }; return; }
+    yukleniyor.value = true;
+    try {
+        const payload = { tarih: tatilModal.tarih, ad: tatilModal.ad, tur: tatilModal.tur, yarim_gun_mu: tatilModal.yarim_gun_mu };
+        const res = await axios.post(route('tanim.tatil-izin.resmi-tatil-store'), payload);
+        const item = res.data.item;
+        const yil = new Date(item.tarih).getFullYear().toString();
+        if (!tatilListesi.value[yil]) tatilListesi.value[yil] = [];
+        const idx = tatilListesi.value[yil].findIndex(x => x.id === item.id || x.tarih === item.tarih);
+        if (idx >= 0) tatilListesi.value[yil][idx] = item;
+        else tatilListesi.value[yil].push(item);
+        tatilListesi.value[yil].sort((a,b) => a.tarih.localeCompare(b.tarih));
+        tatilModal.acik = false;
+        Swal.fire({toast:true, position:'top-end', icon:'success', title:'Kaydedildi', showConfirmButton:false, timer:1400});
+    } catch(e) {
+        tatilModal.errors = e.response?.data?.errors || {};
+    }
+    yukleniyor.value = false;
 };
 
 const deleteTatil = (id) => {
-    Swal.fire({title: 'Emin misiniz?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Evet, Sil'}).then((res) => {
-        if(res.isConfirmed) {
-            router.delete(route('tanim.tatil-izin.resmi-tatil-destroy', id));
+    Swal.fire({title: 'Emin misiniz?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Evet, Sil', cancelButtonText: 'İptal'}).then(async (res) => {
+        if (res.isConfirmed) {
+            try {
+                await axios.delete(route('tanim.tatil-izin.resmi-tatil-destroy', id));
+                const yil = currentYear.value.toString();
+                if (tatilListesi.value[yil]) tatilListesi.value[yil] = tatilListesi.value[yil].filter(x => x.id !== id);
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) { Swal.fire('Hata', 'Silinemedi', 'error'); }
         }
     });
 };
 
-// AI Yıl Seçimi
+// AI Tatil Üret — AJAX ile
 const aiTatilUret = () => {
-    let yearToGenerate = currentYear.value; // Ekranda hangi yıl açıksa
     Swal.fire({
-        title: `${yearToGenerate} Tatillerini İndir`,
-        text: `Yapay zeka ${yearToGenerate} yılına ait Türkiye resmi ve dini tatillerini getirecektir. Onaylıyor musunuz?`,
-        icon: 'info',
-        showCancelButton: true,
-        confirmButtonText: 'Evet, Üret',
-        cancelButtonText: 'İptal'
-    }).then((result) => {
+        title: `${currentYear.value} Tatillerini Üret`,
+        text: `Yapay zeka ${currentYear.value} yılı Türkiye tatillerini getirecek. Onaylıyor musunuz?`,
+        icon: 'info', showCancelButton: true, confirmButtonText: 'Evet, Üret', cancelButtonText: 'İptal'
+    }).then(async (result) => {
         if (result.isConfirmed) {
             isAiLoading.value = true;
-            Swal.fire({
-                title: 'Lütfen Bekleyin...',
-                html: 'Yapay zeka Türkiye takvimini analiz edip tatilleri çıkarıyor.<br><span style="font-size:11px;color:#666;">Bu işlem 10-15 saniye sürebilir...</span>',
-                allowOutsideClick: false,
-                didOpen: () => { Swal.showLoading(); }
-            });
-            router.post(route('tanim.tatil-izin.ai-uret'), { yil: yearToGenerate }, {
-                onFinish: () => { isAiLoading.value = false; Swal.close(); },
-                onSuccess: (page) => {
-                    const flash = page.props.flash || {};
-                    if(flash.success) Swal.fire({toast:true, position:'top-end', icon:'success', title: flash.success, showConfirmButton:false, timer:3000});
-                    else if(flash.error) Swal.fire('Hata', flash.error, 'error');
-                },
-                onError: (err) => { Swal.fire('Hata', Object.values(err)[0], 'error'); }
-            });
+            Swal.fire({ title: 'Lütfen Bekleyin...', html: 'Yapay zeka çalışıyor...<br><span style="font-size:11px;color:#666;">10-15 saniye sürebilir</span>', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const res = await axios.post(route('tanim.tatil-izin.ai-uret'), { yil: currentYear.value });
+                const { tatiller, yil, message } = res.data;
+                tatilListesi.value[yil] = tatiller;
+                Swal.fire({toast:true, position:'top-end', icon:'success', title: message, showConfirmButton:false, timer:3000});
+            } catch(e) {
+                Swal.fire('Hata', e.response?.data?.message || 'Bir hata oluştu', 'error');
+            }
+            isAiLoading.value = false;
         }
     });
 };
 
 const mevcutYillar = computed(() => {
-    const keys = Object.keys(props.resmiTatiller || {});
+    const keys = Object.keys(tatilListesi.value || {});
     const buYil = new Date().getFullYear().toString();
     if (!keys.includes(buYil)) keys.push(buYil);
     return keys.sort((a,b) => b - a);
 });
 
-const aktifYilTatilleri = computed(() => {
-    return props.resmiTatiller[currentYear.value] || [];
-});
+const aktifYilTatilleri = computed(() => tatilListesi.value[currentYear.value] || []);
 
 const formatDate = (d) => { if(!d) return ''; return new Date(d).toLocaleDateString('tr-TR'); };
 </script>
@@ -187,7 +191,7 @@ const formatDate = (d) => { if(!d) return ''; return new Date(d).toLocaleDateStr
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="iz in izinTurleri" :key="iz.id" class="border-b border-gray-100 hover:bg-gray-50">
+                            <tr v-for="iz in izinListesi" :key="iz.id" class="border-b border-gray-100 hover:bg-gray-50">
                                 <td class="px-3 py-2"><span :class="iz.aktif_mi ? 'bg-green-500' : 'bg-red-500'" class="w-2.5 h-2.5 rounded-full inline-block"></span></td>
                                 <td class="px-3 py-2 font-medium">{{ iz.ad }}</td>
                                 <td class="px-3 py-2 text-center">
@@ -269,60 +273,57 @@ const formatDate = (d) => { if(!d) return ''; return new Date(d).toLocaleDateStr
         </div>
     </div>
 
-    <!-- İzin Modal -->
-    <div v-if="izinModalAcik" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div v-if="izinModal.acik" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
         <div class="bg-white rounded shadow-xl w-[400px] border border-gray-300 overflow-hidden">
-            <div class="bg-gray-100 px-4 py-3 border-b border-gray-300 flex justify-between items-center"><h3 class="font-bold">{{ izinForm.id ? 'İzin Düzenle' : 'Yeni İzin Türü' }}</h3><button @click="izinModalAcik=false" class="text-gray-500">&times;</button></div>
+            <div class="bg-gray-100 px-4 py-3 border-b border-gray-300 flex justify-between items-center"><h3 class="font-bold">{{ izinModal.id ? 'İzin Düzenle' : 'Yeni İzin Türü' }}</h3><button @click="izinModal.acik=false" class="text-gray-500">&times;</button></div>
             <div class="p-4 space-y-4">
                 <div>
                     <label class="block text-xs font-semibold mb-1">İzin Adı *</label>
-                    <input v-model="izinForm.ad" type="text" class="w-full text-sm rounded border-gray-300 focus:border-blue-500" placeholder="Örn: Mazeret İzni">
-                    <div v-if="izinForm.errors.ad" class="text-red-500 text-xs">{{ izinForm.errors.ad }}</div>
+                    <input v-model="izinModal.ad" type="text" class="w-full text-sm rounded border-gray-300 focus:border-blue-500" placeholder="Örn: Mazeret İzni">
+                    <div v-if="izinModal.errors.ad" class="text-red-500 text-xs">{{ izinModal.errors.ad }}</div>
                 </div>
                 <div class="p-2 border border-orange-200 bg-orange-50 rounded">
-                    <label class="flex items-center"><input v-model="izinForm.ucret_kesintisi_yapilacak_mi" type="checkbox" class="rounded text-orange-600 focus:ring-orange-500"><span class="ml-2 text-sm text-gray-700 font-medium">Maaştan Kesinti Yapılacak (Ücretsiz)</span></label>
-                    <p class="text-[10px] text-gray-500 mt-1 ml-6">Çarpanlarda veya aylık puantajda bu günler kesintiye uğrar.</p>
+                    <label class="flex items-center"><input v-model="izinModal.ucret_kesintisi_yapilacak_mi" type="checkbox" class="rounded text-orange-600 focus:ring-orange-500"><span class="ml-2 text-sm text-gray-700 font-medium">Maaştan Kesinti Yapılacak (Ücretsiz)</span></label>
                 </div>
                 <div>
-                    <label class="flex items-center"><input v-model="izinForm.yillik_izinden_duser_mi" type="checkbox" class="rounded text-blue-600"><span class="ml-2 text-sm text-gray-700">Yıllık izinden düşülecek</span></label>
+                    <label class="flex items-center"><input v-model="izinModal.yillik_izinden_duser_mi" type="checkbox" class="rounded text-blue-600"><span class="ml-2 text-sm text-gray-700">Yıllık izinden düşülecek</span></label>
                 </div>
                 <div>
-                    <label class="flex items-center"><input v-model="izinForm.aktif_mi" type="checkbox" class="rounded text-green-600"><span class="ml-2 text-sm text-gray-700">Aktif</span></label>
+                    <label class="flex items-center"><input v-model="izinModal.aktif_mi" type="checkbox" class="rounded text-green-600"><span class="ml-2 text-sm text-gray-700">Aktif</span></label>
                 </div>
             </div>
             <div class="bg-gray-50 p-3 border-t border-gray-200 flex justify-end gap-2">
-                <button @click="izinModalAcik=false" class="px-3 py-1.5 border bg-white rounded text-sm text-gray-600 hover:bg-gray-100">İptal</button>
-                <button @click="saveIzin" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">Kaydet</button>
+                <button @click="izinModal.acik=false" class="px-3 py-1.5 border bg-white rounded text-sm text-gray-600 hover:bg-gray-100">İptal</button>
+                <button @click="saveIzin" :disabled="yukleniyor" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50">{{ yukleniyor ? 'Kaydediliyor...' : 'Kaydet' }}</button>
             </div>
         </div>
     </div>
 
     <!-- Tatil Modal -->
-    <div v-if="tatilModalAcik" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+    <div v-if="tatilModal.acik" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
         <div class="bg-white rounded shadow-xl w-[400px] border border-gray-300 overflow-hidden">
-            <div class="bg-gray-100 px-4 py-3 border-b border-gray-300 flex justify-between items-center"><h3 class="font-bold">{{ tatilForm.id ? 'Tatil Düzenle' : 'Yeni Tatil Ekle' }}</h3><button @click="tatilModalAcik=false" class="text-gray-500">&times;</button></div>
+            <div class="bg-gray-100 px-4 py-3 border-b border-gray-300 flex justify-between items-center"><h3 class="font-bold">{{ tatilModal.id ? 'Tatil Düzenle' : 'Yeni Tatil Ekle' }}</h3><button @click="tatilModal.acik=false" class="text-gray-500">&times;</button></div>
             <div class="p-4 space-y-4">
                 <div>
                     <label class="block text-xs font-semibold mb-1">Tarih *</label>
-                    <input v-model="tatilForm.tarih" type="date" class="w-full text-sm rounded border-gray-300 focus:border-red-500" required>
-                    <div v-if="tatilForm.errors.tarih" class="text-red-500 text-xs">{{ tatilForm.errors.tarih }}</div>
+                    <input v-model="tatilModal.tarih" type="date" class="w-full text-sm rounded border-gray-300 focus:border-red-500" required>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold mb-1">Tatil Adı *</label>
-                    <input v-model="tatilForm.ad" type="text" class="w-full text-sm rounded border-gray-300 focus:border-red-500" placeholder="Örn: 23 Nisan" required>
-                    <div v-if="tatilForm.errors.ad" class="text-red-500 text-xs">{{ tatilForm.errors.ad }}</div>
+                    <input v-model="tatilModal.ad" type="text" class="w-full text-sm rounded border-gray-300 focus:border-red-500" placeholder="Örn: 23 Nisan" required>
+                    <div v-if="tatilModal.errors.ad" class="text-red-500 text-xs">{{ tatilModal.errors.ad }}</div>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold mb-1">Türü</label>
-                    <input v-model="tatilForm.tur" type="text" class="w-full text-sm rounded border-gray-300 focus:border-red-500" placeholder="Örn: Resmi Tatil">
+                    <input v-model="tatilModal.tur" type="text" class="w-full text-sm rounded border-gray-300 focus:border-red-500" placeholder="Örn: Resmi Tatil">
                 </div>
                 <div class="bg-orange-50 p-2 border border-orange-200 rounded">
-                    <label class="flex items-center"><input v-model="tatilForm.yarim_gun_mu" type="checkbox" class="rounded text-orange-600 border-gray-300"><span class="ml-2 text-sm text-gray-700 font-medium">Bu tatil ARİFE (Yarım Gün) mü?</span></label>
+                    <label class="flex items-center"><input v-model="tatilModal.yarim_gun_mu" type="checkbox" class="rounded text-orange-600 border-gray-300"><span class="ml-2 text-sm text-gray-700 font-medium">Bu tatil ARİFE (Yarım Gün) mü?</span></label>
                 </div>
             </div>
             <div class="bg-gray-50 p-3 border-t border-gray-200 flex justify-end gap-2">
-                <button @click="tatilModalAcik=false" class="px-3 py-1.5 border bg-white rounded text-sm text-gray-600 hover:bg-gray-100">İptal</button>
-                <button @click="saveTatil" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700">Kaydet</button>
+                <button @click="tatilModal.acik=false" class="px-3 py-1.5 border bg-white rounded text-sm text-gray-600 hover:bg-gray-100">İptal</button>
+                <button @click="saveTatil" :disabled="yukleniyor" class="px-3 py-1.5 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50">{{ yukleniyor ? 'Kaydediliyor...' : 'Kaydet' }}</button>
             </div>
         </div>
     </div>

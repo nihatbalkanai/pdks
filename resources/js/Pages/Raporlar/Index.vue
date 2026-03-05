@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router, Link } from '@inertiajs/vue3';
+import axios from 'axios';
 import debounce from 'lodash/debounce';
 
 const props = defineProps({
@@ -38,7 +39,7 @@ const fetchReports = debounce(() => {
 // Excel Çıktısı (Henüz Arka Plan Yazılmadı, Bildirim Amaçlı Buton)
 const exportExcel = () => {
     alert("Excel dışa aktarma işlemi başlatılıyor. Bildirim merkezini takip edebilirsiniz...");
-    router.post(route('raporlar.export'), filters.value, { preserveScroll: true });
+    axios.post(route('raporlar.export'), filters.value, { preserveScroll: true }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
 };
 
 // Toplam çalışma saatini okunabilir formata çeviren optimizasyonlu Computed Property değil, 

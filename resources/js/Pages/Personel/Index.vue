@@ -216,7 +216,7 @@ const deletePersonel = () => {
         confirmButtonText: 'Evet, Sil!', cancelButtonText: 'İptal'
     }).then((result) => {
         if (result.isConfirmed) {
-            router.delete(route('personeller.destroy', selectedPersonel.value.id), {
+            axios.delete(route('personeller.destroy', selectedPersonel.value.id)).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'), {
                 onSuccess: () => {
                     Swal.fire('Silindi!', 'Personel başarıyla silindi.', 'success');
                     selectedPersonel.value = JSON.parse(JSON.stringify(emptyPersonel));

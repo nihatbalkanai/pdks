@@ -57,17 +57,17 @@ class TanimKoduController extends Controller
             ->first();
 
         if ($mevcut) {
-            return back()->withErrors(['kod' => 'Bu kod zaten tanımlı.']);
+            return response()->json(['success' => false, 'message' => 'Bu kod zaten tanımlı.'], 422);
         }
 
-        TanimKodu::create([
+        $kayit = TanimKodu::create([
             'firma_id' => $firma_id,
             'tip' => $tip,
             'kod' => $validated['kod'],
             'aciklama' => $validated['aciklama'],
         ]);
 
-        return back()->with('success', 'Kayıt eklendi.');
+        return response()->json(['success' => true, 'item' => $kayit]);
     }
 
     public function update(Request $request, $tip, $id)
@@ -80,7 +80,7 @@ class TanimKoduController extends Controller
         $kayit = TanimKodu::findOrFail($id);
         $kayit->update($validated);
 
-        return back()->with('success', 'Kayıt güncellendi.');
+        return response()->json(['success' => true, 'item' => $kayit->fresh()]);
     }
 
     public function destroy($tip, $id)
@@ -88,6 +88,6 @@ class TanimKoduController extends Controller
         $kayit = TanimKodu::findOrFail($id);
         $kayit->delete();
 
-        return back()->with('success', 'Kayıt silindi.');
+        return response()->json(['success' => true]);
     }
 }

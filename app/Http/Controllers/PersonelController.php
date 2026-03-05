@@ -185,6 +185,6 @@ class PersonelController extends Controller
     {
         $personel->delete();
 
-        return redirect()->route('personeller.index')->with('success', 'Personel başarıyla silindi.');
+        return response()->json(['success' => true, 'message' => 'Personel başarıyla silindi.']);
     }
 }

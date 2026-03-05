@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({ bildirimler: Array });
@@ -10,7 +11,7 @@ const showForm = ref(false);
 const editMode = ref(false);
 const editId = ref(null);
 
-const form = useForm({
+const form = reactive({
     ad: '',
     tip: 'maas_gunu',
     kanal: 'her_ikisi',
@@ -46,7 +47,7 @@ const sablonKullan = (s) => {
 };
 
 const resetForm = () => {
-    form.reset();
+    // form reset (reactive)
     editMode.value = false;
     editId.value = null;
 };
@@ -75,9 +76,7 @@ const save = () => {
             onSuccess: () => { showForm.value = false; resetForm(); Swal.fire('Başarılı!', 'Bildirim güncellendi.', 'success'); }
         });
     } else {
-        form.post(route('toplu-islemler.zamanlanmis-bildirimler.store'), {
-            onSuccess: () => { showForm.value = false; resetForm(); Swal.fire('Başarılı!', 'Bildirim oluşturuldu.', 'success'); }
-        });
+        axios.post(route('toplu-islemler.zamanlanmis-bildirimler.store'), { ...form }).then(() => { showForm.value = false; resetForm(); Swal.fire('Başarılı!', 'Bildirim oluşturuldu.', 'success'); }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
     }
 };
 
@@ -87,7 +86,7 @@ const toggleAktif = (id) => {
 
 const sil = (id) => {
     Swal.fire({ title: 'Emin misiniz?', text: 'Bu zamanlanmış bildirim silinecek.', icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sil', cancelButtonText: 'İptal' })
-    .then(r => { if (r.isConfirmed) router.delete(route('toplu-islemler.zamanlanmis-bildirimler.destroy', id)); });
+    .then(r => { if (r.isConfirmed) axios.delete(route('toplu-islemler.zamanlanmis-bildirimler.destroy', id)).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error')); });
 };
 </script>
 

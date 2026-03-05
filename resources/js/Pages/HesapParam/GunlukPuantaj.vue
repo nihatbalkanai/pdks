@@ -1,143 +1,119 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, reactive, watch } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({ parametreler: Array });
 
+const liste = ref([...(props.parametreler || [])]);
 const seciliId = ref(null);
 const activeTab = ref('genel');
 
 const seciliParametre = computed(() => {
     if (!seciliId.value) return null;
-    return props.parametreler.find(p => p.id === seciliId.value) || null;
+    return liste.value.find(p => p.id === seciliId.value) || null;
 });
 
-// Parametre seçildiğinde formu doldur
+const form = reactive({
+    id: null, ad: '', gun_donum_saati: '06:00', iceri_giris_saati: '08:30',
+    disari_cikis_saati: '18:00', erken_gelme_toleransi: '08:00', gec_gelme_toleransi: '22:22',
+    erken_cikma_toleransi: '22:22', hesaplama_tipi: 'normal_toplam',
+    mola_suresi: 0, gec_gelme_cezasi: 0, erken_cikma_cezasi: 0, durum: true,
+});
+
 watch(seciliId, (id) => {
-    const p = props.parametreler.find(x => x.id === id);
+    const p = liste.value.find(x => x.id === id);
     if (p) {
-        form.id = p.id;
-        form.ad = p.ad;
-        form.gun_donum_saati = p.gun_donum_saati || '06:00';
-        form.iceri_giris_saati = p.iceri_giris_saati || '08:30';
-        form.disari_cikis_saati = p.disari_cikis_saati || '18:00';
-        form.erken_gelme_toleransi = p.erken_gelme_toleransi || '08:00';
-        form.gec_gelme_toleransi = p.gec_gelme_toleransi || '22:22';
-        form.erken_cikma_toleransi = p.erken_cikma_toleransi || '22:22';
-        form.hesaplama_tipi = p.hesaplama_tipi || 'normal_toplam';
-        form.mola_suresi = p.mola_suresi || 0;
-        form.gec_gelme_cezasi = p.gec_gelme_cezasi || 0;
-        form.erken_cikma_cezasi = p.erken_cikma_cezasi || 0;
-        form.durum = p.durum;
+        Object.assign(form, {
+            id: p.id, ad: p.ad, gun_donum_saati: p.gun_donum_saati || '06:00',
+            iceri_giris_saati: p.iceri_giris_saati || '08:30', disari_cikis_saati: p.disari_cikis_saati || '18:00',
+            erken_gelme_toleransi: p.erken_gelme_toleransi || '08:00', gec_gelme_toleransi: p.gec_gelme_toleransi || '22:22',
+            erken_cikma_toleransi: p.erken_cikma_toleransi || '22:22', hesaplama_tipi: p.hesaplama_tipi || 'normal_toplam',
+            mola_suresi: p.mola_suresi || 0, gec_gelme_cezasi: p.gec_gelme_cezasi || 0,
+            erken_cikma_cezasi: p.erken_cikma_cezasi || 0, durum: p.durum,
+        });
     }
 });
 
-// Ana form
-const form = useForm({
-    id: null,
-    ad: '',
-    gun_donum_saati: '06:00',
-    iceri_giris_saati: '08:30',
-    disari_cikis_saati: '18:00',
-    erken_gelme_toleransi: '08:00',
-    gec_gelme_toleransi: '22:22',
-    erken_cikma_toleransi: '22:22',
-    hesaplama_tipi: 'normal_toplam',
-    mola_suresi: 0,
-    gec_gelme_cezasi: 0,
-    erken_cikma_cezasi: 0,
-    durum: true,
-});
-
+const yeniModalAcik = ref(false);
 const yeniParametre = () => {
     seciliId.value = null;
-    form.reset();
-    form.id = null;
-    form.durum = true;
-    form.gun_donum_saati = '06:00';
-    form.iceri_giris_saati = '08:30';
-    form.disari_cikis_saati = '18:00';
-    form.erken_gelme_toleransi = '08:00';
-    form.gec_gelme_toleransi = '22:22';
-    form.erken_cikma_toleransi = '22:22';
-    form.hesaplama_tipi = 'normal_toplam';
+    Object.assign(form, { id: null, ad: '', gun_donum_saati: '06:00', iceri_giris_saati: '08:30', disari_cikis_saati: '18:00', erken_gelme_toleransi: '08:00', gec_gelme_toleransi: '22:22', erken_cikma_toleransi: '22:22', hesaplama_tipi: 'normal_toplam', mola_suresi: 0, gec_gelme_cezasi: 0, erken_cikma_cezasi: 0, durum: true });
     yeniModalAcik.value = true;
 };
-const yeniModalAcik = ref(false);
 
-const kaydet = () => {
-    if (form.id) {
-        form.put(route('tanim.gunluk-puantaj.update', form.id), {
-            onSuccess: () => Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1500})
-        });
-    } else {
-        form.post(route('tanim.gunluk-puantaj.store'), {
-            onSuccess: () => { yeniModalAcik.value = false; Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1500}); }
-        });
-    }
+const kaydet = async () => {
+    try {
+        if (form.id) {
+            const res = await axios.put(route('tanim.gunluk-puantaj.update', form.id), { ...form });
+            const idx = liste.value.findIndex(x => x.id === form.id);
+            if (idx >= 0) liste.value[idx] = res.data.item;
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1200});
+        } else {
+            const res = await axios.post(route('tanim.gunluk-puantaj.store'), { ...form });
+            liste.value.push(res.data.item);
+            seciliId.value = res.data.item.id;
+            yeniModalAcik.value = false;
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1200});
+        }
+    } catch(e) { Swal.fire('Hata', e.response?.data?.message || 'İşlem başarısız', 'error'); }
 };
 
 const sil = (id) => {
-    Swal.fire({title: 'Emin misiniz?', text: 'Bu parametre silinecektir.', icon: 'warning', showCancelButton: true, confirmButtonText: 'Evet, Sil'}).then((res) => {
-        if(res.isConfirmed) {
-            router.delete(route('tanim.gunluk-puantaj.destroy', id), {
-                onSuccess: () => { seciliId.value = null; }
-            });
+    Swal.fire({title:'Emin misiniz?', text:'Bu parametre silinecektir.', icon:'warning', showCancelButton:true, confirmButtonText:'Evet, Sil'}).then(async (res) => {
+        if (res.isConfirmed) {
+            try {
+                await axios.delete(route('tanim.gunluk-puantaj.destroy', id));
+                liste.value = liste.value.filter(x => x.id !== id);
+                seciliId.value = null;
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) { Swal.fire('Hata', 'Silinemedi', 'error'); }
         }
     });
 };
 
 // Bordro Alanları
-const bordroForm = useForm({
-    id: null,
-    bordro_alani: '',
-    basla: '08:30',
-    bitis: '18:00',
-    min_sure: '00:30',
-    max_sure: '22:00',
-    ekle: '00:00',
-    carpan: 100,
-    ucret: 'ucret_1',
-});
+const bordroForm = reactive({ id: null, bordro_alani: '', basla: '08:30', bitis: '18:00', min_sure: '00:30', max_sure: '22:00', ekle: '00:00', carpan: 100, ucret: 'ucret_1' });
 const bordroModalAcik = ref(false);
 
 const openBordroModal = (item = null) => {
     if (item) {
-        bordroForm.id = item.id;
-        bordroForm.bordro_alani = item.bordro_alani;
-        bordroForm.basla = item.basla || '08:30';
-        bordroForm.bitis = item.bitis || '18:00';
-        bordroForm.min_sure = item.min_sure || '00:30';
-        bordroForm.max_sure = item.max_sure || '22:00';
-        bordroForm.ekle = item.ekle || '00:00';
-        bordroForm.carpan = item.carpan || 100;
-        bordroForm.ucret = item.ucret || 'ucret_1';
+        Object.assign(bordroForm, { id: item.id, bordro_alani: item.bordro_alani, basla: item.basla || '08:30', bitis: item.bitis || '18:00', min_sure: item.min_sure || '00:30', max_sure: item.max_sure || '22:00', ekle: item.ekle || '00:00', carpan: item.carpan || 100, ucret: item.ucret || 'ucret_1' });
     } else {
-        bordroForm.reset();
-        bordroForm.id = null;
-        bordroForm.carpan = 100;
-        bordroForm.ucret = 'ucret_1';
+        Object.assign(bordroForm, { id: null, bordro_alani: '', basla: '08:30', bitis: '18:00', min_sure: '00:30', max_sure: '22:00', ekle: '00:00', carpan: 100, ucret: 'ucret_1' });
     }
     bordroModalAcik.value = true;
 };
 
-const saveBordro = () => {
-    if (bordroForm.id) {
-        bordroForm.put(route('tanim.gunluk-puantaj.bordro-update', bordroForm.id), {
-            onSuccess: () => { bordroModalAcik.value = false; Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1500}); }
-        });
-    } else {
-        bordroForm.post(route('tanim.gunluk-puantaj.bordro-store', seciliId.value), {
-            onSuccess: () => { bordroModalAcik.value = false; Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1500}); }
-        });
-    }
+const saveBordro = async () => {
+    try {
+        if (bordroForm.id) {
+            const res = await axios.put(route('tanim.gunluk-puantaj.bordro-update', bordroForm.id), { ...bordroForm });
+            const ba = seciliParametre.value?.bordro_alanlari;
+            if (ba) { const idx = ba.findIndex(x => x.id === bordroForm.id); if (idx >= 0) ba[idx] = res.data.item; }
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1200});
+        } else {
+            const res = await axios.post(route('tanim.gunluk-puantaj.bordro-store', seciliId.value), { ...bordroForm });
+            if (!seciliParametre.value.bordro_alanlari) seciliParametre.value.bordro_alanlari = [];
+            seciliParametre.value.bordro_alanlari.push(res.data.item);
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1200});
+        }
+        bordroModalAcik.value = false;
+    } catch(e) { Swal.fire('Hata', e.response?.data?.message || 'İşlem başarısız', 'error'); }
 };
 
 const deleteBordro = (id) => {
-    Swal.fire({title: 'Emin misiniz?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Evet, Sil'}).then((res) => {
-        if(res.isConfirmed) router.delete(route('tanim.gunluk-puantaj.bordro-destroy', id));
+    Swal.fire({title:'Emin misiniz?', icon:'warning', showCancelButton:true, confirmButtonText:'Evet, Sil'}).then(async (res) => {
+        if (res.isConfirmed) {
+            try {
+                await axios.delete(route('tanim.gunluk-puantaj.bordro-destroy', id));
+                const ba = seciliParametre.value?.bordro_alanlari;
+                if (ba) { const idx = ba.findIndex(x => x.id === id); if (idx >= 0) ba.splice(idx, 1); }
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) { Swal.fire('Hata', 'Silinemedi', 'error'); }
+        }
     });
 };
 
@@ -159,7 +135,7 @@ const kopyaOlustur = () => {
             <!-- Başlık -->
             <div class="bg-gradient-to-r from-[#d8e4f8] to-[#c0d0e8] border-b border-gray-400 px-4 py-2 flex items-center">
                 <svg class="w-5 h-5 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                <h2 class="font-bold text-sm text-gray-800">Günlük Puantaj Tablosu</h2>
+                <h2 class="font-bold text-xs text-gray-800">Günlük Puantaj Tablosu</h2>
             </div>
 
             <div class="flex flex-1 overflow-hidden">
@@ -168,14 +144,14 @@ const kopyaOlustur = () => {
                 <div class="w-64 border-r border-gray-300 bg-white flex flex-col">
                     <div class="bg-gray-100 px-3 py-2 border-b border-gray-300 font-bold text-xs text-gray-700">Tablo Adı</div>
                     <div class="flex-1 overflow-y-auto">
-                        <div v-for="p in parametreler" :key="p.id" 
+                        <div v-for="p in liste" :key="p.id" 
                             @click="seciliId = p.id"
-                            class="px-3 py-2 text-sm cursor-pointer border-b border-gray-100 flex items-center gap-2 transition"
+                            class="px-3 py-2 text-xs cursor-pointer border-b border-gray-100 flex items-center gap-2 transition"
                             :class="seciliId === p.id ? 'bg-yellow-100 font-bold text-gray-900 border-l-4 border-yellow-400' : 'hover:bg-gray-50 text-gray-700'">
                             <span v-if="seciliId === p.id" class="text-yellow-600">▶</span>
                             {{ p.ad }}
                         </div>
-                        <div v-if="!parametreler.length" class="px-3 py-6 text-center text-gray-400 text-xs">Henüz tablo yok.</div>
+                        <div v-if="!liste.length" class="px-3 py-6 text-center text-gray-400 text-xs">Henüz tablo yok.</div>
                     </div>
                     <!-- Alt Butonlar -->
                     <div class="border-t border-gray-300 bg-gray-50 px-2 py-2 flex gap-1">
@@ -190,15 +166,15 @@ const kopyaOlustur = () => {
                     <div v-if="!seciliParametre" class="flex-1 flex items-center justify-center text-gray-400">
                         <div class="text-center">
                             <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            <p class="text-sm">Soldaki listeden bir tablo seçin veya yeni oluşturun.</p>
+                            <p class="text-xs">Soldaki listeden bir tablo seçin veya yeni oluşturun.</p>
                         </div>
                     </div>
 
                     <template v-if="seciliParametre">
                         <!-- Sekmeler -->
                         <div class="flex bg-gray-100 border-b border-gray-300">
-                            <button @click="activeTab='genel'" class="px-5 py-2 text-sm font-semibold transition" :class="activeTab==='genel' ? 'bg-white border-b-2 border-purple-500 text-purple-700' : 'text-gray-600 hover:bg-gray-200'">Genel</button>
-                            <button @click="activeTab='mola'" class="px-5 py-2 text-sm font-semibold transition" :class="activeTab==='mola' ? 'bg-white border-b-2 border-purple-500 text-purple-700' : 'text-gray-600 hover:bg-gray-200'">Mola / Ceza</button>
+                            <button @click="activeTab='genel'" class="px-5 py-2 text-xs font-semibold transition" :class="activeTab==='genel' ? 'bg-white border-b-2 border-purple-500 text-purple-700' : 'text-gray-600 hover:bg-gray-200'">Genel</button>
+                            <button @click="activeTab='mola'" class="px-5 py-2 text-xs font-semibold transition" :class="activeTab==='mola' ? 'bg-white border-b-2 border-purple-500 text-purple-700' : 'text-gray-600 hover:bg-gray-200'">Mola / Ceza</button>
                         </div>
 
                         <div class="flex-1 overflow-y-auto p-4">
@@ -207,42 +183,42 @@ const kopyaOlustur = () => {
                                 <div class="grid grid-cols-2 gap-x-8 gap-y-3">
                                     <div class="col-span-2">
                                         <label class="block text-xs font-bold mb-1">Adı:</label>
-                                        <input v-model="form.ad" type="text" class="w-full text-sm rounded border-gray-300 focus:border-purple-500 bg-white" />
+                                        <input v-model="form.ad" type="text" class="w-full text-xs rounded border-gray-300 focus:border-purple-500 bg-white" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Gün dönüm saati:</label>
-                                        <input v-model="form.gun_donum_saati" type="time" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model="form.gun_donum_saati" type="time" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Erken gelme toleransı:</label>
-                                        <input v-model="form.erken_gelme_toleransi" type="time" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model="form.erken_gelme_toleransi" type="time" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">İçeri giriş saati:</label>
-                                        <input v-model="form.iceri_giris_saati" type="time" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model="form.iceri_giris_saati" type="time" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Geç gelme toleransı:</label>
-                                        <input v-model="form.gec_gelme_toleransi" type="time" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model="form.gec_gelme_toleransi" type="time" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Dışarı çıkış saati:</label>
-                                        <input v-model="form.disari_cikis_saati" type="time" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model="form.disari_cikis_saati" type="time" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Erken çıkma toleransı:</label>
-                                        <input v-model="form.erken_cikma_toleransi" type="time" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model="form.erken_cikma_toleransi" type="time" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Hesaplama tipi:</label>
-                                        <select v-model="form.hesaplama_tipi" class="w-full text-sm rounded border-gray-300 focus:border-purple-500">
+                                        <select v-model="form.hesaplama_tipi" class="w-full text-xs rounded border-gray-300 focus:border-purple-500">
                                             <option value="normal_toplam">Normal toplam</option>
                                             <option value="net_toplam">Net toplam</option>
                                         </select>
                                     </div>
                                 </div>
                                 <div class="mt-4 flex justify-end">
-                                    <button @click="kaydet" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded text-sm shadow transition">Kaydet</button>
+                                    <button @click="kaydet" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded text-xs shadow transition">Kaydet</button>
                                 </div>
                             </div>
 
@@ -251,26 +227,26 @@ const kopyaOlustur = () => {
                                 <div class="grid grid-cols-3 gap-4">
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Mola süresi (dk):</label>
-                                        <input v-model.number="form.mola_suresi" type="number" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model.number="form.mola_suresi" type="number" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Geç gelme cezası (dk):</label>
-                                        <input v-model.number="form.gec_gelme_cezasi" type="number" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model.number="form.gec_gelme_cezasi" type="number" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                     <div>
                                         <label class="block text-xs font-bold mb-1">Erken çıkma cezası (dk):</label>
-                                        <input v-model.number="form.erken_cikma_cezasi" type="number" class="w-full text-sm rounded border-gray-300 focus:border-purple-500" />
+                                        <input v-model.number="form.erken_cikma_cezasi" type="number" class="w-full text-xs rounded border-gray-300 focus:border-purple-500" />
                                     </div>
                                 </div>
                                 <div class="mt-4 flex justify-end">
-                                    <button @click="kaydet" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded text-sm shadow transition">Kaydet</button>
+                                    <button @click="kaydet" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded text-xs shadow transition">Kaydet</button>
                                 </div>
                             </div>
 
                             <!-- BORDRO ALANLARI -->
                             <div class="mt-6 border-t border-gray-300 pt-4">
                                 <div class="flex justify-between items-center mb-2">
-                                    <h4 class="font-bold text-sm text-gray-700">Bordro Alanları</h4>
+                                    <h4 class="font-bold text-xs text-gray-700">Bordro Alanları</h4>
                                     <button @click="openBordroModal()" class="bg-green-500 hover:bg-green-600 text-white rounded p-1.5" title="Yeni Bordro Alanı"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg></button>
                                 </div>
                                 <table class="w-full text-xs text-left bg-white border border-gray-200">
@@ -320,19 +296,19 @@ const kopyaOlustur = () => {
         <div class="bg-white rounded shadow-xl w-[420px] border border-gray-300 overflow-hidden">
             <div class="bg-gray-100 px-4 py-3 border-b border-gray-300 flex justify-between items-center"><h3 class="font-bold">Yeni Günlük Puantaj Tablosu</h3><button @click="yeniModalAcik=false" class="text-gray-500 text-xl">&times;</button></div>
             <div class="p-4 space-y-3">
-                <div><label class="block text-xs font-bold mb-1">Tablo Adı *</label><input v-model="form.ad" type="text" class="w-full text-sm rounded border-gray-300" placeholder="Örn: HAFTA İÇİ MAVİ YAKA"></div>
+                <div><label class="block text-xs font-bold mb-1">Tablo Adı *</label><input v-model="form.ad" type="text" class="w-full text-xs rounded border-gray-300" placeholder="Örn: HAFTA İÇİ MAVİ YAKA"></div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs font-bold mb-1">Gün dönüm saati</label><input v-model="form.gun_donum_saati" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">İçeri giriş saati</label><input v-model="form.iceri_giris_saati" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">Dışarı çıkış saati</label><input v-model="form.disari_cikis_saati" type="time" class="w-full text-sm rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Gün dönüm saati</label><input v-model="form.gun_donum_saati" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">İçeri giriş saati</label><input v-model="form.iceri_giris_saati" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Dışarı çıkış saati</label><input v-model="form.disari_cikis_saati" type="time" class="w-full text-xs rounded border-gray-300"></div>
                     <div><label class="block text-xs font-bold mb-1">Hesaplama tipi</label>
-                        <select v-model="form.hesaplama_tipi" class="w-full text-sm rounded border-gray-300"><option value="normal_toplam">Normal toplam</option><option value="net_toplam">Net toplam</option></select>
+                        <select v-model="form.hesaplama_tipi" class="w-full text-xs rounded border-gray-300"><option value="normal_toplam">Normal toplam</option><option value="net_toplam">Net toplam</option></select>
                     </div>
                 </div>
             </div>
             <div class="bg-gray-50 p-3 border-t border-gray-200 flex justify-end gap-2">
-                <button @click="yeniModalAcik=false" class="px-3 py-1.5 border bg-white rounded text-sm hover:bg-gray-100">İptal</button>
-                <button @click="kaydet" class="px-3 py-1.5 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">Kaydet</button>
+                <button @click="yeniModalAcik=false" class="px-3 py-1.5 border bg-white rounded text-xs hover:bg-gray-100">İptal</button>
+                <button @click="kaydet" class="px-3 py-1.5 bg-purple-600 text-white rounded text-xs hover:bg-purple-700">Kaydet</button>
             </div>
         </div>
     </div>
@@ -342,17 +318,17 @@ const kopyaOlustur = () => {
         <div class="bg-white rounded shadow-xl w-[500px] border border-gray-300 overflow-hidden">
             <div class="bg-gray-100 px-4 py-3 border-b border-gray-300 flex justify-between items-center"><h3 class="font-bold">{{ bordroForm.id ? 'Bordro Alanı Düzenle' : 'Yeni Bordro Alanı' }}</h3><button @click="bordroModalAcik=false" class="text-gray-500 text-xl">&times;</button></div>
             <div class="p-4 space-y-3">
-                <div><label class="block text-xs font-bold mb-1">Bordro Alanı Adı *</label><input v-model="bordroForm.bordro_alani" type="text" class="w-full text-sm rounded border-gray-300" placeholder="Örn: FAZLA MESAİ %50"></div>
+                <div><label class="block text-xs font-bold mb-1">Bordro Alanı Adı *</label><input v-model="bordroForm.bordro_alani" type="text" class="w-full text-xs rounded border-gray-300" placeholder="Örn: FAZLA MESAİ %50"></div>
                 <div class="grid grid-cols-3 gap-3">
-                    <div><label class="block text-xs font-bold mb-1">Başla</label><input v-model="bordroForm.basla" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">Bitiş</label><input v-model="bordroForm.bitis" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">Min Süre</label><input v-model="bordroForm.min_sure" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">Max Süre</label><input v-model="bordroForm.max_sure" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">Ekle</label><input v-model="bordroForm.ekle" type="time" class="w-full text-sm rounded border-gray-300"></div>
-                    <div><label class="block text-xs font-bold mb-1">Çarpan (%)</label><input v-model.number="bordroForm.carpan" type="number" class="w-full text-sm rounded border-gray-300" placeholder="150"></div>
+                    <div><label class="block text-xs font-bold mb-1">Başla</label><input v-model="bordroForm.basla" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Bitiş</label><input v-model="bordroForm.bitis" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Min Süre</label><input v-model="bordroForm.min_sure" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Max Süre</label><input v-model="bordroForm.max_sure" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Ekle</label><input v-model="bordroForm.ekle" type="time" class="w-full text-xs rounded border-gray-300"></div>
+                    <div><label class="block text-xs font-bold mb-1">Çarpan (%)</label><input v-model.number="bordroForm.carpan" type="number" class="w-full text-xs rounded border-gray-300" placeholder="150"></div>
                 </div>
                 <div><label class="block text-xs font-bold mb-1">Ücret Alanı</label>
-                    <select v-model="bordroForm.ucret" class="w-full text-sm rounded border-gray-300">
+                    <select v-model="bordroForm.ucret" class="w-full text-xs rounded border-gray-300">
                         <option value="ucret_1">Ücret 1</option>
                         <option value="ucret_2">Ücret 2</option>
                         <option value="ucret_3">Ücret 3</option>
@@ -360,8 +336,8 @@ const kopyaOlustur = () => {
                 </div>
             </div>
             <div class="bg-gray-50 p-3 border-t border-gray-200 flex justify-end gap-2">
-                <button @click="bordroModalAcik=false" class="px-3 py-1.5 border bg-white rounded text-sm hover:bg-gray-100">İptal</button>
-                <button @click="saveBordro" class="px-3 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700">Kaydet</button>
+                <button @click="bordroModalAcik=false" class="px-3 py-1.5 border bg-white rounded text-xs hover:bg-gray-100">İptal</button>
+                <button @click="saveBordro" class="px-3 py-1.5 bg-green-600 text-white rounded text-xs hover:bg-green-700">Kaydet</button>
             </div>
         </div>
     </div>

@@ -41,7 +41,7 @@ class AylikPuantajParametresiController extends Controller
 
         $parametre = AylikPuantajParametresi::create($validated);
 
-        return redirect()->route('tanim.puantaj-parametreleri.index')->with('success', 'Parametre eklendi.');
+        return response()->json(['success' => true, 'message' => 'Parametre eklendi.']);
     }
 
     public function update(Request $request, $id)
@@ -63,7 +63,7 @@ class AylikPuantajParametresiController extends Controller
         $parametre = AylikPuantajParametresi::where('firma_id', $firma_id)->findOrFail($id);
         $parametre->update($validated);
 
-        return redirect()->route('tanim.puantaj-parametreleri.index')->with('success', 'Parametre güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Parametre güncellendi.']);
     }
 
     public function destroy($id)
@@ -73,6 +73,6 @@ class AylikPuantajParametresiController extends Controller
         $parametre = AylikPuantajParametresi::where('firma_id', $firma_id)->findOrFail($id);
         $parametre->delete();
 
-        return redirect()->route('tanim.puantaj-parametreleri.index')->with('success', 'Parametre silindi.');
+        return response()->json(['success' => true, 'message' => 'Parametre silindi.']);
     }
 }

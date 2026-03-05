@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({
@@ -72,7 +73,7 @@ const deleteHatali = () => {
         confirmButtonText: 'Tümünü Sil',
     }).then((result) => {
         if (result.isConfirmed) {
-            router.delete(route('cihaz-transfer.hatali-sil'), {
+            axios.delete(route('cihaz-transfer.hatali-sil')).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'), {
                 onSuccess: () => {
                     Swal.fire({ title: 'Silindi!', text: 'Tüm hatalı kayıtlar silindi.', icon: 'success', timer: 1500 });
                 }

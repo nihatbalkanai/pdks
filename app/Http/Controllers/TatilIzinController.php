@@ -42,9 +42,9 @@ class TatilIzinController extends Controller
 
         $validated['firma_id'] = Auth::user()->firma_id ?? 1;
 
-        IzinTuru::create($validated);
+        $izinTuru = IzinTuru::create($validated);
 
-        return redirect()->back()->with('success', 'İzin türü eklendi.');
+        return response()->json(['success' => true, 'item' => $izinTuru, 'message' => 'İzin türü eklendi.']);
     }
 
     public function izinTuruUpdate(Request $request, $id)
@@ -61,7 +61,7 @@ class TatilIzinController extends Controller
         
         $izinTuru->update($validated);
 
-        return redirect()->back()->with('success', 'İzin türü güncellendi.');
+        return response()->json(['success' => true, 'item' => $izinTuru->fresh(), 'message' => 'İzin türü güncellendi.']);
     }
 
     public function izinTuruDestroy($id)
@@ -70,7 +70,7 @@ class TatilIzinController extends Controller
         $izinTuru = IzinTuru::where('firma_id', $firma_id)->findOrFail($id);
         $izinTuru->delete();
 
-        return redirect()->back()->with('success', 'İzin türü silindi.');
+        return response()->json(['success' => true, 'message' => 'İzin türü silindi.']);
     }
 
     // --- RESMİ TATİLLER (MANUEL EKLENME) ---
@@ -92,11 +92,12 @@ class TatilIzinController extends Controller
         $kontrol = ResmiTatil::where('firma_id', $firma_id)->where('tarih', $validated['tarih'])->first();
         if ($kontrol) {
             $kontrol->update($validated);
+            $tatil = $kontrol->fresh();
         } else {
-            ResmiTatil::create($validated);
+            $tatil = ResmiTatil::create($validated);
         }
 
-        return redirect()->back()->with('success', 'Resmi tatil/izin günü kaydedildi.');
+        return response()->json(['success' => true, 'item' => $tatil, 'message' => 'Resmi tatil kaydedildi.']);
     }
 
     public function resmiTatilDestroy($id)
@@ -105,7 +106,7 @@ class TatilIzinController extends Controller
         $resmiTatil = ResmiTatil::where('firma_id', $firma_id)->findOrFail($id);
         $resmiTatil->delete();
 
-        return redirect()->back()->with('success', 'Tatil silindi.');
+        return response()->json(['success' => true, 'message' => 'Tatil silindi.']);
     }
 
     // --- AI YIL BAZLI RESMİ TATİL ÜRETİMİ ---
@@ -120,7 +121,7 @@ class TatilIzinController extends Controller
         $model = config('openai.model');
 
         if (empty($apiKey)) {
-            return back()->with('error', 'OpenAI API Anahtarı bulunamadı.');
+            return response()->json(['success' => false, 'message' => 'OpenAI API Anahtarı bulunamadı.'], 422);
         }
 
         $prompt = "Bana $yil yılı için Türkiye'deki tüm resmi ve dini tatilleri (Ramazan Bayramı, Kurban Bayramı, 23 Nisan, 19 Mayıs, 15 Temmuz, 30 Ağustos, 29 Ekim vb.) sadece ve sadece aşağıdaki JSON formatında bir dizi olarak döndür:
@@ -174,16 +175,18 @@ Ekstra metin, mardown ticki (```) olmasın doğrudan JSON çevrilebilecek dizi o
                         }
                     }
 
-                    return back()->with('success', "Yapay Zeka $yil yılı için başarıyla $eklenen tatil/izin ekledi.");
+                    // Güncel tatilleri döndür
+                    $tatiller = ResmiTatil::where('firma_id', $firma_id)->where('yil', $yil)->orderBy('tarih')->get();
+                    return response()->json(['success' => true, 'message' => "$yil için $eklenen tatil eklendi.", 'yil' => $yil, 'tatiller' => $tatiller]);
                 } else {
-                    return back()->with('error', 'OpenAI geçersiz bir JSON formatı döndürdü: ' . substr($aiResponseContent, 0, 100));
+                    return response()->json(['success' => false, 'message' => 'OpenAI geçersiz JSON döndürdü.'], 422);
                 }
             } else {
-                return back()->with('error', 'OpenAI API Hatası: ' . $response->body());
+                return response()->json(['success' => false, 'message' => 'OpenAI API Hatası.'], 422);
             }
 
         } catch (\Exception $e) {
-            return back()->with('error', 'Bağlantı hatası veya zaman aşımı: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Bağlantı hatası: ' . $e->getMessage()], 500);
         }
     }
 }

@@ -47,7 +47,7 @@ class TopluIslemController extends Controller
             $sayac++;
         }
 
-        return back()->with('success', "$sayac personelin maaşı güncellendi.");
+        return response()->json(['success' => true, 'message' => '$sayac personelin maaşı güncellendi.']);
     }
 
     // Toplu Hareket
@@ -97,7 +97,7 @@ class TopluIslemController extends Controller
             }
         }
 
-        return back()->with('success', "$sayac gün için hareket kayıtları oluşturuldu.");
+        return response()->json(['success' => true, 'message' => '$sayac gün için hareket kayıtları oluşturuldu.']);
     }
 
     // Toplu İzin
@@ -147,7 +147,7 @@ class TopluIslemController extends Controller
             }
         }
 
-        return back()->with('success', "$sayac izin kaydı oluşturuldu.");
+        return response()->json(['success' => true, 'message' => '$sayac izin kaydı oluşturuldu.']);
     }
 
     // Toplu Avans
@@ -187,7 +187,7 @@ class TopluIslemController extends Controller
             $sayac++;
         }
 
-        return back()->with('success', "$sayac personele avans tanımlandı.");
+        return response()->json(['success' => true, 'message' => '$sayac personele avans tanımlandı.']);
     }
 
     // Toplu Prim
@@ -227,7 +227,7 @@ class TopluIslemController extends Controller
             $sayac++;
         }
 
-        return back()->with('success', "$sayac personele prim tanımlandı.");
+        return response()->json(['success' => true, 'message' => '$sayac personele prim tanımlandı.']);
     }
 
     // Toplu AGİ Atama
@@ -252,7 +252,7 @@ class TopluIslemController extends Controller
             $sayac++;
         }
 
-        return back()->with('success', "$sayac personele AGİ atandı.");
+        return response()->json(['success' => true, 'message' => '$sayac personele AGİ atandı.']);
     }
 
     // Toplu Giriş Çıkış Düzenleme
@@ -338,7 +338,7 @@ class TopluIslemController extends Controller
             $sayac++;
         }
 
-        return back()->with('success', "$sayac personelin giriş-çıkış kayıtları güncellendi.");
+        return response()->json(['success' => true, 'message' => '$sayac personelin giriş-çıkış kayıtları güncellendi.']);
     }
 
     public function girisCikisTarihSil(Request $request)
@@ -349,7 +349,7 @@ class TopluIslemController extends Controller
             ->whereDate('kayit_tarihi', $request->tarih)
             ->delete();
 
-        return back()->with('success', "$silinen kayıt silindi.");
+        return response()->json(['success' => true, 'message' => '$silinen kayıt silindi.']);
     }
 
     // Toplu Mesaj (SMS) Gönderimi
@@ -401,7 +401,7 @@ class TopluIslemController extends Controller
             $msg .= " " . count($hatalar) . " kişiye gönderilemedi.";
         }
 
-        return back()->with('success', $msg);
+        return response()->json(['success' => true, 'message' => $msg]);
     }
 
     // Toplu E-Posta Gönderimi
@@ -455,6 +455,6 @@ class TopluIslemController extends Controller
             $msg .= " " . count($hatalar) . " kişiye gönderilemedi.";
         }
 
-        return back()->with('success', $msg);
+        return response()->json(['success' => true, 'message' => $msg]);
     }
 }

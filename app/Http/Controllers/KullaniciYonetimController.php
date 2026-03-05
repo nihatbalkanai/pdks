@@ -70,7 +70,7 @@ class KullaniciYonetimController extends Controller
 
         $firma_id = Auth::user()->firma_id ?? 1;
 
-        Kullanici::create([
+        $kullanici = Kullanici::create([
             'firma_id' => $firma_id,
             'ad_soyad' => $validated['ad_soyad'],
             'eposta' => $validated['eposta'],
@@ -78,7 +78,7 @@ class KullaniciYonetimController extends Controller
             'rol' => $validated['rol'],
         ]);
 
-        return back()->with('success', 'Kullanıcı oluşturuldu.');
+        return response()->json(['success' => true, 'item' => $kullanici]);
     }
 
     public function update(Request $request, $id)
@@ -110,20 +110,19 @@ class KullaniciYonetimController extends Controller
 
         $kullanici->update($data);
 
-        return back()->with('success', 'Kullanıcı güncellendi.');
+        return response()->json(['success' => true, 'item' => $kullanici->fresh()]);
     }
 
     public function destroy($id)
     {
         $kullanici = Kullanici::withoutGlobalScopes()->findOrFail($id);
 
-        // Kendi hesabını silemez
         if ($kullanici->id === Auth::id()) {
-            return back()->with('error', 'Kendi hesabınızı silemezsiniz.');
+            return response()->json(['success' => false, 'message' => 'Kendi hesabınızı silemezsiniz.'], 422);
         }
 
         $kullanici->delete();
 
-        return back()->with('success', 'Kullanıcı silindi.');
+        return response()->json(['success' => true]);
     }
 }

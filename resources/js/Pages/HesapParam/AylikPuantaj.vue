@@ -1,7 +1,8 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({
@@ -12,7 +13,7 @@ const isModalOpen = ref(false);
 const isEditing = ref(false);
 const currentId = ref(null);
 
-const form = useForm({
+const form = reactive({
     hesap_parametresi_adi: '',
     aylik_calisma_saati: 225,
     haftalik_calisma_saati: 45,
@@ -40,7 +41,7 @@ const openModal = (parametre = null) => {
     } else {
         isEditing.value = false;
         currentId.value = null;
-        form.reset();
+        // form reset (reactive)
         form.durum = true;
         form.eksik_gun_kesintisi_yapilacak_mi = true;
     }
@@ -49,7 +50,7 @@ const openModal = (parametre = null) => {
 
 const closeModal = () => {
     isModalOpen.value = false;
-    form.reset();
+    // form reset (reactive)
     form.clearErrors();
 };
 
@@ -62,12 +63,7 @@ const saveParametre = () => {
             },
         });
     } else {
-        form.post(route('tanim.puantaj-parametreleri.store'), {
-            onSuccess: () => {
-                closeModal();
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Eklendi', showConfirmButton: false, timer: 1500 });
-            },
-        });
+        axios.post(route('tanim.puantaj-parametreleri.store'), { ...form }).then(() => { closeModal(); Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Eklendi', showConfirmButton: false, timer: 1500 }); }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
     }
 };
 
@@ -261,8 +257,8 @@ const deleteParametre = (id) => {
                 <button type="button" @click="closeModal" class="px-3 py-1.5 border border-gray-300 bg-white text-gray-700 rounded text-sm hover:bg-gray-50 transition">
                     İptal
                 </button>
-                <button type="submit" form="paramForm" :disabled="form.processing" class="px-4 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition disabled:opacity-75 flex items-center">
-                    <svg v-if="form.processing" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <button type="submit" form="paramForm" :disabled="false" class="px-4 py-1.5 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition disabled:opacity-75 flex items-center">
+                    <svg v-if="false" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                     {{ isEditing ? 'Güncelle' : 'Kaydet' }}
                 </button>
             </div>

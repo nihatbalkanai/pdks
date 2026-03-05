@@ -1,7 +1,8 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
+import { ref, reactive } from 'vue';
 import Modal from '@/Components/Modal.vue';
 
 const props = defineProps({
@@ -12,7 +13,7 @@ const props = defineProps({
 const isModalOpen = ref(false);
 const editingServis = ref(null);
 
-const form = useForm({
+const form = reactive({
     plaka: '',
     sofor: '',
     guzergah: '',
@@ -27,7 +28,7 @@ const openModal = (servis = null) => {
         form.guzergah = servis.guzergah;
         form.durum = !!servis.durum;
     } else {
-        form.reset();
+        // form reset (reactive)
         form.durum = true;
     }
     isModalOpen.value = true;
@@ -35,7 +36,7 @@ const openModal = (servis = null) => {
 
 const closeModal = () => {
     isModalOpen.value = false;
-    form.reset();
+    // form reset (reactive)
 };
 
 const saveServis = () => {
@@ -44,15 +45,13 @@ const saveServis = () => {
             onSuccess: () => closeModal()
         });
     } else {
-        form.post(route('servisler.store'), {
-            onSuccess: () => closeModal()
-        });
+        axios.post(route('servisler.store'), { ...form }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
     }
 };
 
 const deleteServis = (id) => {
     if(confirm('Servisi silmek istediğinize emin misiniz?')){
-        form.delete(route('servisler.destroy', id));
+        axios.delete(route('servisler.destroy', id)).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'));
     }
 };
 </script>
@@ -143,7 +142,7 @@ const deleteServis = (id) => {
                     
                     <div class="mt-6 flex justify-end">
                         <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md mr-2 hover:bg-gray-300 transition">İptal</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition" :disabled="form.processing">
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition" :disabled="false">
                             Kaydet
                         </button>
                     </div>

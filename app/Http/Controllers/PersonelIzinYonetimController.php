@@ -198,7 +198,7 @@ class PersonelIzinYonetimController extends Controller
             $this->syncIzinToCalismaPlan($izin, $izinTuru);
         }
 
-        return redirect()->back()->with('success', 'İzin kaydedildi.');
+        return response()->json(['success' => true, 'message' => 'İzin kaydedildi.']);
     }
 
     /**
@@ -231,7 +231,7 @@ class PersonelIzinYonetimController extends Controller
         $izinTuru = IzinTuru::find($validated['izin_turu_id']);
         $this->syncIzinToCalismaPlan($izin, $izinTuru);
 
-        return redirect()->back()->with('success', 'İzin güncellendi.');
+        return response()->json(['success' => true, 'message' => 'İzin güncellendi.']);
     }
 
     /**
@@ -243,7 +243,7 @@ class PersonelIzinYonetimController extends Controller
         $izin = PersonelIzin::where('firma_id', $firma_id)->findOrFail($id);
         $izin->delete();
 
-        return redirect()->back()->with('success', 'İzin silindi.');
+        return response()->json(['success' => true, 'message' => 'İzin silindi.']);
     }
 
     /**

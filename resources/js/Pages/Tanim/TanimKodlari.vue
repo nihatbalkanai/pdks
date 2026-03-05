@@ -1,36 +1,35 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({ tip: String, baslik: String, kodlar: Array });
 
-const selectedIndex = ref(props.kodlar.length > 0 ? 0 : -1);
+const liste = ref([...(props.kodlar || [])]);
+const selectedIndex = ref(liste.value.length > 0 ? 0 : -1);
 const editMode = ref(false);
 
-const form = useForm({ kod: '', aciklama: '' });
+const form = reactive({ kod: '', aciklama: '' });
 
 const selected = computed(() => {
-    if (selectedIndex.value >= 0 && selectedIndex.value < props.kodlar.length) {
-        return props.kodlar[selectedIndex.value];
+    if (selectedIndex.value >= 0 && selectedIndex.value < liste.value.length) {
+        return liste.value[selectedIndex.value];
     }
     return null;
 });
 
-// Satıra tıklayınca seç ve formu doldur
 const selectRow = (i) => {
     selectedIndex.value = i;
-    const k = props.kodlar[i];
+    const k = liste.value[i];
     form.kod = k.kod;
     form.aciklama = k.aciklama;
     editMode.value = false;
 };
 
-// Yeni kayıt
 const yeniKayit = () => {
-    // Sonraki kodu otomatik bul
-    const maxKod = props.kodlar.reduce((max, k) => {
+    const maxKod = liste.value.reduce((max, k) => {
         const n = parseInt(k.kod);
         return isNaN(n) ? max : Math.max(max, n);
     }, 0);
@@ -40,62 +39,60 @@ const yeniKayit = () => {
     selectedIndex.value = -1;
 };
 
-// Kaydet (yeni veya güncelle)
-const kaydet = () => {
+const kaydet = async () => {
     if (!form.kod || !form.aciklama) {
         Swal.fire('Uyarı', 'Kod ve açıklama zorunludur.', 'warning');
         return;
     }
-
-    if (editMode.value && selectedIndex.value === -1) {
-        // Yeni kayıt
-        form.post(route('tanim.kodlar.store', props.tip), {
-            onSuccess: () => { editMode.value = false; Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Eklendi', showConfirmButton: false, timer: 1500 }); },
-            onError: (e) => Swal.fire('Hata', Object.values(e).flat().join('<br>'), 'error'),
-        });
-    } else if (selected.value) {
-        // Güncelleme
-        form.put(route('tanim.kodlar.update', { tip: props.tip, id: selected.value.id }), {
-            onSuccess: () => { editMode.value = false; Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Güncellendi', showConfirmButton: false, timer: 1500 }); },
-            onError: (e) => Swal.fire('Hata', Object.values(e).flat().join('<br>'), 'error'),
-        });
+    try {
+        if (editMode.value && selectedIndex.value === -1) {
+            const res = await axios.post(route('tanim.kodlar.store', props.tip), { ...form });
+            liste.value.push(res.data.item);
+            selectedIndex.value = liste.value.length - 1;
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Eklendi', showConfirmButton:false, timer:1200});
+        } else if (selected.value) {
+            const res = await axios.put(route('tanim.kodlar.update', { tip: props.tip, id: selected.value.id }), { ...form });
+            liste.value[selectedIndex.value] = res.data.item;
+            Swal.fire({toast:true, position:'top-end', icon:'success', title:'Güncellendi', showConfirmButton:false, timer:1200});
+        }
+        editMode.value = false;
+    } catch(e) {
+        Swal.fire('Hata', e.response?.data?.message || 'İşlem başarısız', 'error');
     }
 };
 
-// Düzenle
 const duzenle = () => {
     if (!selected.value) { Swal.fire('Uyarı', 'Düzenlenecek kaydı seçin.', 'warning'); return; }
     editMode.value = true;
 };
 
-// Sil
 const sil = () => {
     if (!selected.value) { Swal.fire('Uyarı', 'Silinecek kaydı seçin.', 'warning'); return; }
     Swal.fire({
         title: 'Kaydı Sil',
         html: `<b>${selected.value.kod} - ${selected.value.aciklama}</b> silinecek. Emin misiniz?`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Sil',
-        cancelButtonText: 'İptal',
-    }).then(r => {
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'Sil', cancelButtonText: 'İptal',
+    }).then(async r => {
         if (r.isConfirmed) {
-            router.delete(route('tanim.kodlar.destroy', { tip: props.tip, id: selected.value.id }), {
-                onSuccess: () => { selectedIndex.value = -1; form.reset(); },
-            });
+            try {
+                await axios.delete(route('tanim.kodlar.destroy', { tip: props.tip, id: selected.value.id }));
+                liste.value.splice(selectedIndex.value, 1);
+                selectedIndex.value = liste.value.length > 0 ? 0 : -1;
+                if (selected.value) { form.kod = selected.value.kod; form.aciklama = selected.value.aciklama; }
+                else { form.kod = ''; form.aciklama = ''; }
+                Swal.fire({toast:true, position:'top-end', icon:'success', title:'Silindi', showConfirmButton:false, timer:1200});
+            } catch(e) { Swal.fire('Hata', 'Silinemedi', 'error'); }
         }
     });
 };
 
-// İptal
 const iptal = () => {
     editMode.value = false;
     if (selected.value) {
         form.kod = selected.value.kod;
         form.aciklama = selected.value.aciklama;
     } else {
-        form.reset();
+        form.kod = ''; form.aciklama = '';
     }
 };
 </script>
@@ -115,7 +112,7 @@ const iptal = () => {
                     <svg v-else-if="tip==='hesap_gurubu'" class="w-5 h-5 mr-2 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path></svg>
                     <svg v-else class="w-5 h-5 mr-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
                     <h2 class="font-bold text-sm text-gray-800">{{ baslik }}</h2>
-                    <span class="ml-2 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">{{ kodlar.length }} kayıt</span>
+                    <span class="ml-2 bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-[10px] font-bold">{{ liste.length }} kayıt</span>
                 </div>
             </div>
 
@@ -129,14 +126,14 @@ const iptal = () => {
                         </tr>
                     </thead>
                     <tbody>
-                        <tr v-for="(k, i) in kodlar" :key="k.id"
+                        <tr v-for="(k, i) in liste" :key="k.id"
                             @click="selectRow(i)"
                             class="cursor-pointer transition"
                             :class="selectedIndex === i ? 'bg-[#f0c860] font-bold' : 'bg-[#d4e2f4] hover:bg-[#bfd0e8]'">
                             <td class="py-1 px-3 border border-gray-300 text-right">{{ k.kod }}</td>
                             <td class="py-1 px-3 border border-gray-300">{{ k.aciklama }}</td>
                         </tr>
-                        <tr v-if="kodlar.length === 0">
+                        <tr v-if="liste.length === 0">
                             <td colspan="2" class="py-16 text-center text-gray-500 bg-[#d4e2f4]">
                                 &lt;Gösterilecek Bilgi yok&gt;
                             </td>
@@ -175,7 +172,7 @@ const iptal = () => {
                     <button @click="iptal" class="w-9 h-9 flex items-center justify-center border border-gray-400 rounded bg-gradient-to-b from-[#f8f0d8] to-[#e8d8b0] hover:from-[#ffe8a8] hover:to-[#e0c888] shadow-sm" title="İptal">
                         <svg class="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                     </button>
-                    <button @click="$inertia.reload()" class="w-9 h-9 flex items-center justify-center border border-gray-400 rounded bg-gradient-to-b from-[#f8f0d8] to-[#e8d8b0] hover:from-[#ffe8a8] hover:to-[#e0c888] shadow-sm" title="Yenile">
+                    <button @click="router.reload()" class="w-9 h-9 flex items-center justify-center border border-gray-400 rounded bg-gradient-to-b from-[#f8f0d8] to-[#e8d8b0] hover:from-[#ffe8a8] hover:to-[#e0c888] shadow-sm" title="Yenile">
                         <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                     </button>
                 </div>

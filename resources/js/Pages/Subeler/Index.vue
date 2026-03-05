@@ -1,7 +1,8 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, usePage } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { Head, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
+import { ref, reactive } from 'vue';
 import Modal from '@/Components/Modal.vue';
 
 const props = defineProps({
@@ -11,7 +12,7 @@ const props = defineProps({
 const isModalOpen = ref(false);
 const editingSube = ref(null);
 
-const form = useForm({
+const form = reactive({
     sube_adi: '',
     lokasyon: '',
     durum: true
@@ -24,7 +25,7 @@ const openModal = (sube = null) => {
         form.lokasyon = sube.lokasyon;
         form.durum = !!sube.durum;
     } else {
-        form.reset();
+        // form reset (reactive)
         form.durum = true;
     }
     isModalOpen.value = true;
@@ -32,7 +33,7 @@ const openModal = (sube = null) => {
 
 const closeModal = () => {
     isModalOpen.value = false;
-    form.reset();
+    // form reset (reactive)
 };
 
 const saveSube = () => {
@@ -41,15 +42,13 @@ const saveSube = () => {
             onSuccess: () => closeModal()
         });
     } else {
-        form.post(route('subeler.store'), {
-            onSuccess: () => closeModal()
-        });
+        axios.post(route('subeler.store'), { ...form }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
     }
 };
 
 const deleteSube = (id) => {
     if(confirm('Şubeyi silmek istediğinize emin misiniz? DİKKAT: İçindeki personeller silinmez ancak şube atamaları kalkar.')){
-        form.delete(route('subeler.destroy', id));
+        axios.delete(route('subeler.destroy', id)).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Silinemedi', 'error'));
     }
 };
 </script>
@@ -136,7 +135,7 @@ const deleteSube = (id) => {
                     
                     <div class="mt-6 flex justify-end">
                         <button type="button" @click="closeModal" class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md mr-2 hover:bg-gray-300 transition">İptal</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition" :disabled="form.processing">
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition" :disabled="false">
                             Kaydet
                         </button>
                     </div>

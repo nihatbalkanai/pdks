@@ -84,7 +84,7 @@ class SuperAdminController extends Controller
             'durum' => $request->durum
         ]);
 
-        return redirect()->back()->with('success', 'Firma abonelik detayları güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Firma abonelik detayları güncellendi.']);
     }
 
     public function updateAdminYetki(Request $request, $id)
@@ -102,6 +102,6 @@ class SuperAdminController extends Controller
             ['yetkiler' => $request->yetkiler ?? []]
         );
 
-        return redirect()->back()->with('success', 'Admin yetkileri başarıyla güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Admin yetkileri başarıyla güncellendi.']);
     }
 }

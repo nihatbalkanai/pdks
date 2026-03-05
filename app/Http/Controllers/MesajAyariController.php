@@ -40,7 +40,7 @@ class MesajAyariController extends Controller
             array_merge($validated, ['firma_id' => $firma_id, 'kanal' => 'email'])
         );
 
-        return back()->with('success', 'Mail ayarları kaydedildi.');
+        return response()->json(['success' => true, 'message' => 'Mail ayarları kaydedildi.']);
     }
 
     public function mailTest(Request $request)
@@ -49,7 +49,7 @@ class MesajAyariController extends Controller
 
         // TODO: Gerçek SMTP test gönderimi
         // Şimdilik simülasyon
-        return back()->with('success', "Test maili {$request->test_email} adresine gönderildi.");
+        return response()->json(['success' => true, 'message' => 'Test maili {$request->test_email} adresine gönderildi.']);
     }
 
     public function mesajAyarlari()
@@ -80,7 +80,7 @@ class MesajAyariController extends Controller
             array_merge($validated, ['firma_id' => $firma_id, 'kanal' => 'sms'])
         );
 
-        return back()->with('success', 'SMS ayarları kaydedildi.');
+        return response()->json(['success' => true, 'message' => 'SMS ayarları kaydedildi.']);
     }
 
     public function mesajTest(Request $request)
@@ -88,6 +88,6 @@ class MesajAyariController extends Controller
         $request->validate(['test_telefon' => 'required|string']);
 
         // TODO: Gerçek SMS API test gönderimi
-        return back()->with('success', "Test mesajı {$request->test_telefon} numarasına gönderildi.");
+        return response()->json(['success' => true, 'message' => 'Test mesajı {$request->test_telefon} numarasına gönderildi.']);
     }
 }

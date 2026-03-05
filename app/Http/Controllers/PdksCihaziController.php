@@ -54,7 +54,7 @@ class PdksCihaziController extends Controller
             'firma_id' => Auth::user()->firma_id ?? 1
         ]));
 
-        return redirect()->route('cihazlar.index')->with('success', 'Cihaz başarıyla eklendi.');
+        return response()->json(['success' => true, 'message' => 'Cihaz başarıyla eklendi.']);
     }
 
     /**
@@ -69,7 +69,7 @@ class PdksCihaziController extends Controller
 
         $cihaz->update($validated);
 
-        return redirect()->route('cihazlar.index')->with('success', 'Cihaz başarıyla güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Cihaz başarıyla güncellendi.']);
     }
 
     /**
@@ -79,6 +79,6 @@ class PdksCihaziController extends Controller
     {
         $cihaz->delete();
 
-        return redirect()->route('cihazlar.index')->with('success', 'Cihaz başarıyla kaldırıldı.');
+        return response()->json(['success' => true, 'message' => 'Cihaz başarıyla kaldırıldı.']);
     }
 }

@@ -1,12 +1,13 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head } from '@inertiajs/vue3';
+import axios from 'axios';
 import Swal from 'sweetalert2';
 
 const props = defineProps({ ayar: Object });
 
-const form = useForm({
+const form = reactive({
     sms_api_url: props.ayar?.sms_api_url || '',
     api_anahtari: '',
     sms_kullanici: props.ayar?.sms_kullanici || '',
@@ -15,7 +16,7 @@ const form = useForm({
     durum: props.ayar?.durum ?? true,
 });
 
-const testForm = useForm({ test_telefon: '' });
+const testForm = reactive({ test_telefon: '' });
 const showKeys = ref(false);
 
 const smsServisleri = [
@@ -28,10 +29,7 @@ const smsServisleri = [
 const secServis = (s) => { form.sms_api_url = s.url; };
 
 const save = () => {
-    form.post(route('tanim.mesaj-ayarlari.kaydet'), {
-        onSuccess: () => Swal.fire('Başarılı!', 'SMS ayarları kaydedildi.', 'success'),
-        onError: () => Swal.fire('Hata', 'Kaydetme başarısız.', 'error'),
-    });
+    axios.post(route('tanim.mesaj-ayarlari.kaydet'), { ...form }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
 };
 
 const sendTest = () => {
@@ -141,7 +139,7 @@ const sendTest = () => {
             </div>
 
             <div class="flex items-center gap-3 px-4 py-2 bg-gray-100 border-t border-gray-400">
-                <button @click="save" :disabled="form.processing" class="flex items-center bg-green-600 text-white border border-green-700 rounded-sm px-5 py-1.5 text-xs hover:bg-green-700 shadow-sm font-semibold disabled:opacity-50">
+                <button @click="save" :disabled="false" class="flex items-center bg-green-600 text-white border border-green-700 rounded-sm px-5 py-1.5 text-xs hover:bg-green-700 shadow-sm font-semibold disabled:opacity-50">
                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
                     Kaydet
                 </button>

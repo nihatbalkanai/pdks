@@ -72,6 +72,6 @@ class RaporController extends Controller
         ExcelRaporOlusturJob::dispatch(Auth::id(), $filtreler);
 
         // Kullanıcıya anlık mesaj (toast vs) döndür
-        return back()->with('message', 'Raporunuz arka planda hazırlanıyor. İşlem bittiğinde bildirim alacaksınız.');
+        return response()->json(['success' => true, 'message' => 'Raporunuz arka planda hazırlanıyor. İşlem bittiğinde bildirim alacaksınız.']);
     }
 }

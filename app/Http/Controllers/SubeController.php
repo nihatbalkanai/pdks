@@ -31,7 +31,7 @@ class SubeController extends Controller
 
         \App\Models\Sube::create($validated);
 
-        return redirect()->back()->with('success', 'Şube başarıyla eklendi.');
+        return response()->json(['success' => true, 'message' => 'Şube başarıyla eklendi.']);
     }
 
     public function update(\Illuminate\Http\Request $request, \App\Models\Sube $sube)
@@ -46,13 +46,13 @@ class SubeController extends Controller
 
         $sube->update($validated);
 
-        return redirect()->back()->with('success', 'Şube güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Şube güncellendi.']);
     }
 
     public function destroy(\App\Models\Sube $sube)
     {
         \Illuminate\Support\Facades\Gate::authorize('firma_tam_yetki');
         $sube->delete();
-        return redirect()->back()->with('success', 'Şube silindi.');
+        return response()->json(['success' => true, 'message' => 'Şube silindi.']);
     }
 }

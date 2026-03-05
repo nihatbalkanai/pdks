@@ -40,7 +40,7 @@ class ZamanlanmisBildirimController extends Controller
 
         ZamanlanmisBildirim::create($validated);
 
-        return back()->with('success', 'Zamanlanmış bildirim oluşturuldu.');
+        return response()->json(['success' => true, 'message' => 'Zamanlanmış bildirim oluşturuldu.']);
     }
 
     public function update(Request $request, $id)
@@ -61,7 +61,7 @@ class ZamanlanmisBildirimController extends Controller
 
         $bildirim->update($validated);
 
-        return back()->with('success', 'Bildirim güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Bildirim güncellendi.']);
     }
 
     public function toggleAktif($id)
@@ -70,12 +70,12 @@ class ZamanlanmisBildirimController extends Controller
         $bildirim->aktif = !$bildirim->aktif;
         $bildirim->save();
 
-        return back()->with('success', $bildirim->aktif ? 'Bildirim aktif edildi.' : 'Bildirim pasif yapıldı.');
+        return response()->json(['success' => true, 'message' => $bildirim->aktif ? 'Bildirim aktif edildi.' : 'Bildirim pasif yapıldı.']);
     }
 
     public function destroy($id)
     {
         ZamanlanmisBildirim::findOrFail($id)->delete();
-        return back()->with('success', 'Bildirim silindi.');
+        return response()->json(['success' => true, 'message' => 'Bildirim silindi.']);
     }
 }

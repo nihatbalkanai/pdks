@@ -31,9 +31,9 @@ class BordroAlaniController extends Controller
         ]);
 
         $validated['firma_id'] = Auth::user()->firma_id ?? 1;
-        BordroAlani::create($validated);
+        $item = BordroAlani::create($validated);
 
-        return redirect()->back()->with('success', 'Bordro alanı eklendi.');
+        return response()->json(['success' => true, 'message' => 'Bordro alanı eklendi.', 'item' => $item]);
     }
 
     public function update(Request $request, $id)
@@ -51,7 +51,7 @@ class BordroAlaniController extends Controller
         $alan = BordroAlani::where('firma_id', $firma_id)->findOrFail($id);
         $alan->update($validated);
 
-        return redirect()->back()->with('success', 'Bordro alanı güncellendi.');
+        return response()->json(['success' => true, 'message' => 'Bordro alanı güncellendi.', 'item' => $alan]);
     }
 
     public function destroy($id)
@@ -60,6 +60,6 @@ class BordroAlaniController extends Controller
         $alan = BordroAlani::where('firma_id', $firma_id)->findOrFail($id);
         $alan->delete();
 
-        return redirect()->back()->with('success', 'Bordro alanı silindi.');
+        return response()->json(['success' => true, 'message' => 'Bordro alanı silindi.']);
     }
 }

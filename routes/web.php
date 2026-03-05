@@ -42,12 +42,16 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     // Ek Kazançlar
     Route::get('/ek-kazanclar', [\App\Http\Controllers\EkKazancController::class, 'index'])->name('ek-kazanclar.index')->middleware('rol.yetki:ek_kazanclar');
     Route::post('/ek-kazanclar', [\App\Http\Controllers\EkKazancController::class, 'store'])->name('ek-kazanclar.store')->middleware('rol.yetki:ek_kazanclar');
+    Route::delete('/ek-kazanclar/grup/{grupId}', [\App\Http\Controllers\EkKazancController::class, 'destroyGrup'])->name('ek-kazanclar.destroy-grup')->middleware('rol.yetki:ek_kazanclar');
     Route::delete('/ek-kazanclar/{id}', [\App\Http\Controllers\EkKazancController::class, 'destroy'])->name('ek-kazanclar.destroy')->middleware('rol.yetki:ek_kazanclar');
+    Route::put('/ek-kazanclar/{id}', [\App\Http\Controllers\EkKazancController::class, 'update'])->name('ek-kazanclar.update')->middleware('rol.yetki:ek_kazanclar');
 
     // Avans ve Kesintiler
     Route::get('/avans-kesintiler', [\App\Http\Controllers\AvansKesintilerController::class, 'index'])->name('avans-kesintiler.index')->middleware('rol.yetki:avans_kesintiler');
     Route::post('/avans-kesintiler', [\App\Http\Controllers\AvansKesintilerController::class, 'store'])->name('avans-kesintiler.store')->middleware('rol.yetki:avans_kesintiler');
+    Route::delete('/avans-kesintiler/grup/{grupId}', [\App\Http\Controllers\AvansKesintilerController::class, 'destroyGrup'])->name('avans-kesintiler.destroy-grup')->middleware('rol.yetki:avans_kesintiler');
     Route::delete('/avans-kesintiler/{id}', [\App\Http\Controllers\AvansKesintilerController::class, 'destroy'])->name('avans-kesintiler.destroy')->middleware('rol.yetki:avans_kesintiler');
+    Route::put('/avans-kesintiler/{id}', [\App\Http\Controllers\AvansKesintilerController::class, 'update'])->name('avans-kesintiler.update')->middleware('rol.yetki:avans_kesintiler');
 
     // Toplu İşlemler
     Route::prefix('toplu-islemler')->name('toplu-islemler.')->middleware('rol.yetki:toplu_islemler')->group(function () {
