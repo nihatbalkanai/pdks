@@ -33,7 +33,9 @@ const emptyPersonel = {
     email: '', telefon: '', gec_kalma_bildirimi: false, resim_yolu: '', puantaj_parametre_id: null,
     tc_no: '', iban_no: '', adres: '', acil_kisi_adi: '', acil_kisi_telefonu: '',
     izinler: [], avans_kesintiler: [], prim_kazanclar: [], zimmetler: [], pdks_kayitlari: [], dosyalar: [],
-    izin_hakedis: null, mesailer: [], mesai_carpanlari: null
+    izin_hakedis: null, mesailer: [], mesai_carpanlari: null,
+    yemek_tipi: null, yemek_kart_no: null, yemek_ucreti: null,
+    ulasim_tipi: null, servis_plaka: null, yol_parasi: null
 };
 
 const selectedPersonel = ref(JSON.parse(JSON.stringify(emptyPersonel)));
@@ -189,6 +191,12 @@ const savePersonel = async () => {
             adres: selectedPersonel.value.adres || null,
             acil_kisi_adi: selectedPersonel.value.acil_kisi_adi || null,
             acil_kisi_telefonu: selectedPersonel.value.acil_kisi_telefonu || null,
+            yemek_tipi: selectedPersonel.value.yemek_tipi || null,
+            yemek_kart_no: selectedPersonel.value.yemek_kart_no || null,
+            yemek_ucreti: selectedPersonel.value.yemek_ucreti || null,
+            ulasim_tipi: selectedPersonel.value.ulasim_tipi || null,
+            servis_plaka: selectedPersonel.value.servis_plaka || null,
+            yol_parasi: selectedPersonel.value.yol_parasi || null,
         };
 
         if (selectedPersonel.value.id) {
@@ -741,7 +749,7 @@ const uploadResim = async (event) => {
 
                                 <div v-if="activeSubTab === 'ozluk_sub'">
                                     <div class="grid grid-cols-4 gap-x-3 gap-y-2">
-                                        <div class="form-group"><label>AGİ</label><input v-model="selectedPersonel.agi" class="form-input" /></div>
+
                                         <div class="form-group">
                                             <label>Aylık Ücret</label>
                                             <input v-model.lazy="selectedPersonel.aylik_ucret" type="number" step="any" class="form-input text-right" placeholder="50000" @change="hesaplaUcretler" />
@@ -764,6 +772,27 @@ const uploadResim = async (event) => {
                                         </div>
                                         <div class="form-group"><label>Giriş Tarihi</label><input v-model="selectedPersonel.giris_tarihi" type="date" class="form-input" /></div>
                                         <div class="form-group"><label>Çıkış Tarihi</label><input v-model="selectedPersonel.cikis_tarihi" type="date" class="form-input" /></div>
+                                        <div class="form-group">
+                                            <label>Yemek Tipi</label>
+                                            <select v-model="selectedPersonel.yemek_tipi" class="form-input">
+                                                <option :value="null">— Yok —</option>
+                                                <option value="kart">🎫 Yemek Kartı</option>
+                                                <option value="ucret">💰 Yemek Ücreti</option>
+                                            </select>
+                                        </div>
+                                        <div v-if="selectedPersonel.yemek_tipi === 'kart'" class="form-group"><label>Yemek Kart No</label><input v-model="selectedPersonel.yemek_kart_no" class="form-input" placeholder="1234-5678" /></div>
+                                        <div v-if="selectedPersonel.yemek_tipi === 'ucret'" class="form-group"><label>Yemek Ücreti (₺/gün)</label><input v-model="selectedPersonel.yemek_ucreti" type="number" step="0.01" class="form-input text-right" placeholder="150.00" /></div>
+                                        <div v-if="!selectedPersonel.yemek_tipi" class="form-group"></div>
+                                        <div class="form-group">
+                                            <label>Ulaşım Tipi</label>
+                                            <select v-model="selectedPersonel.ulasim_tipi" class="form-input">
+                                                <option :value="null">— Yok —</option>
+                                                <option value="servis">🚌 Servis</option>
+                                                <option value="yol_parasi">💵 Yol Parası</option>
+                                            </select>
+                                        </div>
+                                        <div v-if="selectedPersonel.ulasim_tipi === 'servis'" class="form-group"><label>Servis Plaka</label><input v-model="selectedPersonel.servis_plaka" class="form-input" placeholder="34 ABC 123" /></div>
+                                        <div v-if="selectedPersonel.ulasim_tipi === 'yol_parasi'" class="form-group"><label>Yol Parası (₺/gün)</label><input v-model="selectedPersonel.yol_parasi" type="number" step="0.01" class="form-input text-right" placeholder="75.00" /></div>
                                     </div>
                                 </div>
                             </div>

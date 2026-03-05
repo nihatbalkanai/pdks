@@ -190,17 +190,17 @@ const filtreliPersoneller = computed(() => {
 
             <div class="flex flex-1 overflow-hidden">
                 <!-- SOL: Personel Listesi -->
-                <div class="w-64 border-r border-gray-300 bg-white flex flex-col">
-                    <div class="px-2 py-2 border-b border-gray-200">
-                        <input v-model="arama" type="text" placeholder="Personel ara..." class="w-full text-xs rounded border-gray-300 focus:border-orange-400 px-2 py-1">
+                <div class="w-56 border-r border-gray-400 bg-gray-50 flex flex-col">
+                    <div class="p-2 border-b border-gray-300">
+                        <input v-model="arama" type="text" placeholder="🔍 Ara..." class="w-full border-gray-300 rounded-sm py-1 px-2 text-xs focus:ring-orange-400 focus:border-orange-400">
                     </div>
                     <div class="flex-1 overflow-y-auto">
                         <div v-for="p in filtreliPersoneller" :key="p.id"
                             @click="seciliPersonelId = p.id"
-                            class="px-3 py-2 text-sm cursor-pointer border-b border-gray-100 transition"
-                            :class="seciliPersonelId === p.id ? 'bg-orange-100 font-bold border-l-4 border-orange-400' : 'hover:bg-gray-50'">
-                            <div class="text-gray-800">{{ p.ad }} {{ p.soyad }}</div>
-                            <div class="text-xs text-gray-400">{{ p.sicil_no }} • {{ p.departman }}</div>
+                            class="px-2 py-1.5 text-xs cursor-pointer border-b border-gray-200 hover:bg-orange-50 transition"
+                            :class="seciliPersonelId === p.id ? '!bg-orange-100 font-semibold border-l-2 border-l-orange-500' : ''">
+                            <div class="font-medium truncate">{{ p.ad }} {{ p.soyad }}</div>
+                            <div class="text-[10px] text-gray-500">{{ p.sicil_no || '-' }}</div>
                         </div>
                         <div v-if="!filtreliPersoneller.length" class="px-3 py-6 text-center text-gray-400 text-xs">Personel bulunamadı.</div>
                     </div>

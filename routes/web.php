@@ -88,8 +88,10 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
         Route::post('/avans', [\App\Http\Controllers\TopluIslemController::class, 'avansUygula'])->name('avans.uygula')->middleware('rol.yetki:toplu_avans');
         Route::get('/prim', [\App\Http\Controllers\TopluIslemController::class, 'prim'])->name('prim')->middleware('rol.yetki:toplu_prim');
         Route::post('/prim', [\App\Http\Controllers\TopluIslemController::class, 'primUygula'])->name('prim.uygula')->middleware('rol.yetki:toplu_prim');
-        Route::get('/agi-atama', [\App\Http\Controllers\TopluIslemController::class, 'agiAtama'])->name('agi-atama')->middleware('rol.yetki:toplu_agi');
-        Route::post('/agi-atama', [\App\Http\Controllers\TopluIslemController::class, 'agiAtamaUygula'])->name('agi-atama.uygula')->middleware('rol.yetki:toplu_agi');
+        Route::get('/yemek-atama', [\App\Http\Controllers\TopluIslemController::class, 'yemekAtama'])->name('yemek-atama')->middleware('rol.yetki:toplu_yemek');
+        Route::post('/yemek-atama', [\App\Http\Controllers\TopluIslemController::class, 'yemekAtamaUygula'])->name('yemek-atama.uygula')->middleware('rol.yetki:toplu_yemek');
+        Route::get('/servis-yol-atama', [\App\Http\Controllers\TopluIslemController::class, 'servisYolAtama'])->name('servis-yol-atama')->middleware('rol.yetki:toplu_servis_yol');
+        Route::post('/servis-yol-atama', [\App\Http\Controllers\TopluIslemController::class, 'servisYolAtamaUygula'])->name('servis-yol-atama.uygula')->middleware('rol.yetki:toplu_servis_yol');
         Route::get('/giris-cikis-duzenleme', [\App\Http\Controllers\TopluIslemController::class, 'girisCikisDuzenleme'])->name('giris-cikis-duzenleme')->middleware('rol.yetki:toplu_giris_cikis');
         Route::post('/giris-cikis-duzenleme', [\App\Http\Controllers\TopluIslemController::class, 'girisCikisDuzenlemeKaydet'])->name('giris-cikis-duzenleme.kaydet')->middleware('rol.yetki:toplu_giris_cikis');
         Route::delete('/giris-cikis-duzenleme/tarih-sil', [\App\Http\Controllers\TopluIslemController::class, 'girisCikisTarihSil'])->name('giris-cikis-duzenleme.tarih-sil')->middleware('rol.yetki:toplu_giris_cikis');

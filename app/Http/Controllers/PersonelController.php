@@ -109,9 +109,17 @@ class PersonelController extends Controller
     public function show($id)
     {
         $personel = Personel::withoutGlobalScopes()->findOrFail($id);
-        $personel->load(['izinler.izinTuru', 'avansKesintiler', 'primKazanclar', 'zimmetler', 'dosyalar', 'pdksKayitlari' => function($q) {
-            $q->orderBy('created_at', 'desc')->limit(50);
-        }]);
+        $personel->load([
+            'izinler' => function($q) { $q->withoutGlobalScopes(); },
+            'izinler.izinTuru' => function($q) { $q->withoutGlobalScopes(); },
+            'avansKesintiler' => function($q) { $q->withoutGlobalScopes(); },
+            'primKazanclar' => function($q) { $q->withoutGlobalScopes(); },
+            'zimmetler' => function($q) { $q->withoutGlobalScopes(); },
+            'dosyalar',
+            'pdksKayitlari' => function($q) {
+                $q->withoutGlobalScopes()->orderBy('created_at', 'desc')->limit(50);
+            }
+        ]);
 
         // Onaylanmış izinleri al
         $onayliIzinler = $personel->izinler->where('durum', 'onaylandi');
@@ -177,21 +185,26 @@ class PersonelController extends Controller
         $izinHakedis = null;
         if ($personel->giris_tarihi) {
             $giris = \Carbon\Carbon::parse($personel->giris_tarihi);
-            $kidem = $giris->diffInYears(now());
+            $kidem = (int) $giris->diffInYears(now());
             $yillikHak = 14; // varsayılan
             if ($kidem >= 15) $yillikHak = 26;
             elseif ($kidem >= 5) $yillikHak = 20;
 
+            $yillikDusenTurIds = \App\Models\IzinTuru::withoutGlobalScopes()
+                ->where('yillik_izinden_duser_mi', true)
+                ->pluck('id')
+                ->toArray();
+
             $kullanilanIzin = $personel->izinler
                 ->where('durum', 'onaylandi')
-                ->where('izin_tipi', 'gunluk')
+                ->whereIn('izin_turu_id', $yillikDusenTurIds)
                 ->whereNotNull('gun_sayisi')
                 ->sum('gun_sayisi');
 
             // Bu yıl kullanılan
             $buYilKullanilan = $personel->izinler
                 ->where('durum', 'onaylandi')
-                ->where('izin_tipi', 'gunluk')
+                ->whereIn('izin_turu_id', $yillikDusenTurIds)
                 ->filter(function ($iz) { return \Carbon\Carbon::parse($iz->tarih)->year === now()->year; })
                 ->sum('gun_sayisi');
 
@@ -264,6 +277,12 @@ class PersonelController extends Controller
             'adres' => 'nullable|string',
             'acil_kisi_adi' => 'nullable|string|max:255',
             'acil_kisi_telefonu' => 'nullable|string|max:20',
+            'yemek_tipi' => 'nullable|in:kart,ucret',
+            'yemek_kart_no' => 'nullable|string|max:50',
+            'yemek_ucreti' => 'nullable|numeric|min:0',
+            'ulasim_tipi' => 'nullable|in:servis,yol_parasi',
+            'servis_plaka' => 'nullable|string|max:20',
+            'yol_parasi' => 'nullable|numeric|min:0',
         ]);
 
         $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];

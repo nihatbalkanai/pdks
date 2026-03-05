@@ -62,6 +62,12 @@ class Personel extends Model
         'adres',
         'acil_kisi_adi',
         'acil_kisi_telefonu',
+        'yemek_tipi',
+        'yemek_kart_no',
+        'yemek_ucreti',
+        'ulasim_tipi',
+        'servis_plaka',
+        'yol_parasi',
     ];
 
     public function izinler()

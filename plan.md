@@ -36,7 +36,7 @@
   - İzin talebi oluşturma, bordro bilgileri görme
 
 - [ ] **Mobil / QR Kod Check-in**
-  - Saha personeli için GPS tabanlı giriş/çıkış
+  - GPS tabanlı giriş/çıkış
   - QR kod ile kart yerine telefonla giriş
   - Push bildirimler
 

@@ -230,29 +230,78 @@ class TopluIslemController extends Controller
         return response()->json(['success' => true, 'message' => '$sayac personele prim tanımlandı.']);
     }
 
-    // Toplu AGİ Atama
-    public function agiAtama()
+    // Toplu Yemek Kartı / Yemek Ücreti Atama
+    public function yemekAtama()
     {
-        return Inertia::render('TopluIslemler/AgiAtama', ['personeller' => $this->getPersoneller()]);
+        $personeller = Personel::withoutGlobalScopes()
+            ->select('id','kart_no','ad','soyad','yemek_tipi','yemek_kart_no','yemek_ucreti')
+            ->get();
+        return Inertia::render('TopluIslemler/YemekAtama', ['personeller' => $personeller]);
     }
 
-    public function agiAtamaUygula(Request $request)
+    public function yemekAtamaUygula(Request $request)
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'agi_degeri' => 'required|string',
+            'yemek_tipi' => 'required|in:kart,ucret',
+            'yemek_kart_no' => 'nullable|string|max:50',
+            'yemek_ucreti' => 'nullable|numeric|min:0',
         ]);
 
         $sayac = 0;
         foreach ($request->personel_ids as $id) {
             $p = Personel::withoutGlobalScopes()->find($id);
             if (!$p) continue;
-            $p->agi = $request->agi_degeri;
+            $p->yemek_tipi = $request->yemek_tipi;
+            if ($request->yemek_tipi === 'kart') {
+                $p->yemek_kart_no = $request->yemek_kart_no;
+                $p->yemek_ucreti = null;
+            } else {
+                $p->yemek_kart_no = null;
+                $p->yemek_ucreti = $request->yemek_ucreti;
+            }
             $p->save();
             $sayac++;
         }
 
-        return response()->json(['success' => true, 'message' => '$sayac personele AGİ atandı.']);
+        return response()->json(['success' => true, 'message' => "$sayac personele yemek tanımı atandı."]);
+    }
+
+    // Toplu Servis / Yol Parası Atama
+    public function servisYolAtama()
+    {
+        $personeller = Personel::withoutGlobalScopes()
+            ->select('id','kart_no','ad','soyad','ulasim_tipi','servis_plaka','yol_parasi')
+            ->get();
+        return Inertia::render('TopluIslemler/ServisYolAtama', ['personeller' => $personeller]);
+    }
+
+    public function servisYolAtamaUygula(Request $request)
+    {
+        $request->validate([
+            'personel_ids' => 'required|array|min:1',
+            'ulasim_tipi' => 'required|in:servis,yol_parasi',
+            'servis_plaka' => 'nullable|string|max:20',
+            'yol_parasi' => 'nullable|numeric|min:0',
+        ]);
+
+        $sayac = 0;
+        foreach ($request->personel_ids as $id) {
+            $p = Personel::withoutGlobalScopes()->find($id);
+            if (!$p) continue;
+            $p->ulasim_tipi = $request->ulasim_tipi;
+            if ($request->ulasim_tipi === 'servis') {
+                $p->servis_plaka = $request->servis_plaka;
+                $p->yol_parasi = null;
+            } else {
+                $p->servis_plaka = null;
+                $p->yol_parasi = $request->yol_parasi;
+            }
+            $p->save();
+            $sayac++;
+        }
+
+        return response()->json(['success' => true, 'message' => "$sayac personele ulaşım tanımı atandı."]);
     }
 
     // Toplu Giriş Çıkış Düzenleme
