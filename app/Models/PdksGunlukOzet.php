@@ -23,6 +23,7 @@ class PdksGunlukOzet extends Model
         'ilk_giris',
         'son_cikis',
         'toplam_calisma_suresi',
+        'fazla_mesai_dakika',
         'durum',
     ];
 

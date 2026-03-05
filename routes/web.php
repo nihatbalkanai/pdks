@@ -38,6 +38,29 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     // Raporlar
     Route::get('/raporlar', [\App\Http\Controllers\RaporController::class, 'index'])->name('raporlar.index')->middleware('rol.yetki:raporlar');
     Route::post('/raporlar/export', [\App\Http\Controllers\RaporController::class, 'export'])->name('raporlar.export')->middleware('rol.yetki:raporlar');
+    Route::get('/raporlar/01', [\App\Http\Controllers\RaporController::class, 'r01'])->name('raporlar.r01');
+    Route::get('/raporlar/02', [\App\Http\Controllers\RaporController::class, 'r02'])->name('raporlar.r02');
+    Route::get('/raporlar/03', [\App\Http\Controllers\RaporController::class, 'r03'])->name('raporlar.r03');
+    Route::get('/raporlar/04', [\App\Http\Controllers\RaporController::class, 'r04'])->name('raporlar.r04');
+    Route::get('/raporlar/05', [\App\Http\Controllers\RaporController::class, 'r05'])->name('raporlar.r05');
+    Route::get('/raporlar/06', [\App\Http\Controllers\RaporController::class, 'r06'])->name('raporlar.r06');
+    Route::get('/raporlar/07', [\App\Http\Controllers\RaporController::class, 'r07'])->name('raporlar.r07');
+    Route::get('/raporlar/08', [\App\Http\Controllers\RaporController::class, 'r08'])->name('raporlar.r08');
+    Route::get('/raporlar/09', [\App\Http\Controllers\RaporController::class, 'r09'])->name('raporlar.r09');
+    Route::get('/raporlar/10', [\App\Http\Controllers\RaporController::class, 'r10'])->name('raporlar.r10');
+    Route::get('/raporlar/11', [\App\Http\Controllers\RaporController::class, 'r11'])->name('raporlar.r11');
+    Route::get('/raporlar/12', [\App\Http\Controllers\RaporController::class, 'r12'])->name('raporlar.r12');
+    Route::get('/raporlar/13', [\App\Http\Controllers\RaporController::class, 'r13'])->name('raporlar.r13');
+    Route::get('/raporlar/14', [\App\Http\Controllers\RaporController::class, 'r14'])->name('raporlar.r14');
+    Route::get('/raporlar/15', [\App\Http\Controllers\RaporController::class, 'r15'])->name('raporlar.r15');
+    Route::get('/raporlar/16', [\App\Http\Controllers\RaporController::class, 'r16'])->name('raporlar.r16');
+    Route::get('/raporlar/17', [\App\Http\Controllers\RaporController::class, 'r17'])->name('raporlar.r17');
+    Route::get('/raporlar/18', [\App\Http\Controllers\RaporController::class, 'r18'])->name('raporlar.r18');
+    Route::get('/raporlar/19', [\App\Http\Controllers\RaporController::class, 'r19'])->name('raporlar.r19');
+    Route::get('/raporlar/20', [\App\Http\Controllers\RaporController::class, 'r20'])->name('raporlar.r20');
+    Route::get('/raporlar/21', [\App\Http\Controllers\RaporController::class, 'r21'])->name('raporlar.r21');
+    Route::get('/raporlar/22', [\App\Http\Controllers\RaporController::class, 'r22'])->name('raporlar.r22');
+
 
     // Ek Kazançlar
     Route::get('/ek-kazanclar', [\App\Http\Controllers\EkKazancController::class, 'index'])->name('ek-kazanclar.index')->middleware('rol.yetki:ek_kazanclar');
@@ -155,6 +178,22 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
         Route::delete('/personel-izin/{id}', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'destroy'])->name('personel-izin.destroy');
         Route::post('/personel-izin/{id}/durum', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'durumGuncelle'])->name('personel-izin.durum');
         Route::post('/personel-izin-hesapla', [\App\Http\Controllers\PersonelIzinYonetimController::class, 'hesaplaIzinTarihi'])->name('personel-izin.hesapla');
+
+        // Personel Zimmet Yönetimi
+        Route::post('/personel-zimmet', [\App\Http\Controllers\PersonelZimmetController::class, 'store'])->name('personel-zimmet.store');
+        Route::put('/personel-zimmet/{id}', [\App\Http\Controllers\PersonelZimmetController::class, 'update'])->name('personel-zimmet.update');
+        Route::delete('/personel-zimmet/{id}', [\App\Http\Controllers\PersonelZimmetController::class, 'destroy'])->name('personel-zimmet.destroy');
+        Route::post('/personel-zimmet/{id}/iade', [\App\Http\Controllers\PersonelZimmetController::class, 'iade'])->name('personel-zimmet.iade');
+
+        // Mesai Yönetimi
+        Route::post('/mesai', [\App\Http\Controllers\MesaiController::class, 'store'])->name('mesai.store');
+        Route::put('/mesai/{id}', [\App\Http\Controllers\MesaiController::class, 'update'])->name('mesai.update');
+        Route::delete('/mesai/{id}', [\App\Http\Controllers\MesaiController::class, 'destroy'])->name('mesai.destroy');
+
+        // Personel Dosya Yönetimi
+        Route::post('/personel-dosya', [\App\Http\Controllers\PersonelDosyaController::class, 'store'])->name('personel-dosya.store');
+        Route::delete('/personel-dosya/{id}', [\App\Http\Controllers\PersonelDosyaController::class, 'destroy'])->name('personel-dosya.destroy');
+        Route::get('/personel-dosya/{id}/indir', [\App\Http\Controllers\PersonelDosyaController::class, 'download'])->name('personel-dosya.download');
 
         Route::post('/calisma-gruplari', [\App\Http\Controllers\CalismaPlaniController::class, 'grupStore'])->name('calisma-gruplari.store');
         Route::put('/calisma-gruplari/{id}', [\App\Http\Controllers\CalismaPlaniController::class, 'grupUpdate'])->name('calisma-gruplari.update');

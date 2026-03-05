@@ -356,28 +356,28 @@ onUnmounted(() => {
                         <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
                         Özlük Rapor
                     </div>
-                    <a href="#" class="report-item">01. Genel Bazda Giriş Çıkış Listesi</a>
-                    <a href="#" class="report-item">02. Kişi Bazında Giriş Çıkış Listesi</a>
-                    <a href="#" class="report-item">03. Genel Bazda Geç Kalanlar Listesi</a>
-                    <a href="#" class="report-item">04. Kişi Bazında Geç Kalanlar Listesi</a>
-                    <a href="#" class="report-item">05. Genel Bazda Erken Çıkanlar Listesi</a>
-                    <a href="#" class="report-item">06. Kişi Bazında Erken Çıkanlar Listesi</a>
-                    <a href="#" class="report-item">07. Mesaiye Kalanlar Listesi</a>
-                    <a href="#" class="report-item">08. Devamsızlar Listesi</a>
-                    <a href="#" class="report-item">09. Girişte Kart Kullanmayı Unutanlar</a>
-                    <a href="#" class="report-item">10. Çıkışta Kart Kullanmayı Unutanlar</a>
-                    <a href="#" class="report-item">11. Giriş yada Çıkışta Unutanlar</a>
-                    <a href="#" class="report-item">12. Şuan İçerideki Personeller</a>
-                    <a href="#" class="report-item">13. Elle Müdahale Yapılmış Hareketler</a>
-                    <a href="#" class="report-item">14. Personellerin Not Bilgileri</a>
-                    <a href="#" class="report-item">15. Personellerin İrtibat Bilgileri</a>
-                    <a href="#" class="report-item">16. İşe Giren Personeller</a>
-                    <a href="#" class="report-item">17. İşten Ayrılan Personeller</a>
-                    <a href="#" class="report-item">18. Tatil Günü Çalışanlar</a>
-                    <a href="#" class="report-item">19. İzin Kullananlar</a>
-                    <a href="#" class="report-item">20. Avans Listesi</a>
-                    <a href="#" class="report-item">21. Prim Listesi</a>
-                    <a href="#" class="report-item">22. Aylık Devam Listesi</a>
+                    <a :href="route('raporlar.r01')" class="report-item">01. Genel Bazda Giriş Çıkış Listesi</a>
+                    <a :href="route('raporlar.r02')" class="report-item">02. Kişi Bazında Giriş Çıkış Listesi</a>
+                    <a :href="route('raporlar.r03')" class="report-item">03. Genel Bazda Geç Kalanlar Listesi</a>
+                    <a :href="route('raporlar.r04')" class="report-item">04. Kişi Bazında Geç Kalanlar Listesi</a>
+                    <a :href="route('raporlar.r05')" class="report-item">05. Genel Bazda Erken Çıkanlar Listesi</a>
+                    <a :href="route('raporlar.r06')" class="report-item">06. Kişi Bazında Erken Çıkanlar Listesi</a>
+                    <a :href="route('raporlar.r07')" class="report-item">07. Mesaiye Kalanlar Listesi</a>
+                    <a :href="route('raporlar.r08')" class="report-item">08. Devamsızlar Listesi</a>
+                    <a :href="route('raporlar.r09')" class="report-item">09. Girişte Kart Kullanmayı Unutanlar</a>
+                    <a :href="route('raporlar.r10')" class="report-item">10. Çıkışta Kart Kullanmayı Unutanlar</a>
+                    <a :href="route('raporlar.r11')" class="report-item">11. Giriş yada Çıkışta Unutanlar</a>
+                    <a :href="route('raporlar.r12')" class="report-item">12. Şuan İçerideki Personeller</a>
+                    <a :href="route('raporlar.r13')" class="report-item">13. Elle Müdahale Yapılmış Hareketler</a>
+                    <a :href="route('raporlar.r14')" class="report-item">14. Personellerin Not Bilgileri</a>
+                    <a :href="route('raporlar.r15')" class="report-item">15. Personellerin İrtibat Bilgileri</a>
+                    <a :href="route('raporlar.r16')" class="report-item">16. İşe Giren Personeller</a>
+                    <a :href="route('raporlar.r17')" class="report-item">17. İşten Ayrılan Personeller</a>
+                    <a :href="route('raporlar.r18')" class="report-item">18. Tatil Günü Çalışanlar</a>
+                    <a :href="route('raporlar.r19')" class="report-item">19. İzin Kullananlar</a>
+                    <a :href="route('raporlar.r20')" class="report-item">20. Avans Listesi</a>
+                    <a :href="route('raporlar.r21')" class="report-item">21. Prim Listesi</a>
+                    <a :href="route('raporlar.r22')" class="report-item">22. Aylık Devam Listesi</a>
                 </div>
             </aside>
         </div>

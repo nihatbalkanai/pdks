@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use App\Services\PdksHesaplamaServisi;
 
 class PersonelIzinYonetimController extends Controller
 {
@@ -177,6 +178,28 @@ class PersonelIzinYonetimController extends Controller
             $gunSayisi = 1;
         }
 
+        // Bitiş tarihini belirle
+        $bitisTarihi = $validated['bitis_tarihi'] ?? $validated['tarih'];
+
+        // ===== TARİH ÇAKIŞMA KONTROLÜ =====
+        $cakisan = PersonelIzin::where('firma_id', $firma_id)
+            ->where('personel_id', $validated['personel_id'])
+            ->where(function ($q) use ($validated, $bitisTarihi) {
+                $q->where(function ($q2) use ($validated, $bitisTarihi) {
+                    // Yeni izin mevcut bir izinle çakışıyor mu?
+                    $q2->where('tarih', '<=', $bitisTarihi)
+                       ->where('bitis_tarihi', '>=', $validated['tarih']);
+                });
+            })
+            ->exists();
+
+        if ($cakisan) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bu personelin seçilen tarih aralığında zaten bir izni bulunmaktadır. Çakışan tarihleri kontrol ediniz.',
+            ], 422);
+        }
+
         $izin = PersonelIzin::create([
             'uuid' => Str::uuid(),
             'firma_id' => $firma_id,
@@ -225,6 +248,22 @@ class PersonelIzinYonetimController extends Controller
             $validated['onaylayan_id'] = Auth::id();
         }
 
+        // ===== TARİH ÇAKIŞMA KONTROLÜ (kendisi hariç) =====
+        $bitisTarihi = $validated['bitis_tarihi'] ?? $validated['tarih'];
+        $cakisan = PersonelIzin::where('firma_id', $firma_id)
+            ->where('personel_id', $izin->personel_id)
+            ->where('id', '!=', $id)
+            ->where('tarih', '<=', $bitisTarihi)
+            ->where('bitis_tarihi', '>=', $validated['tarih'])
+            ->exists();
+
+        if ($cakisan) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Bu personelin seçilen tarih aralığında başka bir izni bulunmaktadır.',
+            ], 422);
+        }
+
         $izin->update($validated);
 
         // Çalışma planına yansıt
@@ -235,16 +274,21 @@ class PersonelIzinYonetimController extends Controller
     }
 
     /**
-     * İzin sil
-     */
-    public function destroy($id)
-    {
-        $firma_id = Auth::user()->firma_id ?? 1;
-        $izin = PersonelIzin::where('firma_id', $firma_id)->findOrFail($id);
-        $izin->delete();
+ * İzin sil
+ */
+public function destroy($id)
+{
+    $firma_id = Auth::user()->firma_id ?? 1;
+    $izin = PersonelIzin::where('firma_id', $firma_id)->findOrFail($id);
 
-        return response()->json(['success' => true, 'message' => 'İzin silindi.']);
-    }
+    // Çalışma planından izin günlerini sil
+    $servis = new PdksHesaplamaServisi();
+    $servis->izinSilSenkron($izin);
+
+    $izin->delete();
+
+    return response()->json(['success' => true, 'message' => 'İzin silindi.']);
+}
 
     /**
      * İzin onayla/reddet

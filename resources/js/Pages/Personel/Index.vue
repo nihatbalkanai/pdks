@@ -10,6 +10,7 @@ const props = defineProps({
     filtreler: Object,
     tanimKodlari: Object,
     aylikPuantajParametreleri: { type: Array, default: () => [] },
+    gunlukPuantajParametreleri: { type: Array, default: () => [] },
 });
 
 // Tanım kodları helper
@@ -29,8 +30,10 @@ const emptyPersonel = {
     servis_kodu: '', hesap_gurubu: '', agi: '', aylik_ucret: '',
     gunluk_ucret: '', saat_1: '', saat_2: '', saat_3: '',
     giris_tarihi: '', cikis_tarihi: '', durum: true, notlar: '',
-    email: '', telefon: '', gec_kalma_bildirimi: false, resim_yolu: '',
-    izinler: [], avans_kesintiler: [], prim_kazanclar: [], zimmetler: [], pdks_kayitlari: []
+    email: '', telefon: '', gec_kalma_bildirimi: false, resim_yolu: '', puantaj_parametre_id: null,
+    tc_no: '', iban_no: '', adres: '', acil_kisi_adi: '', acil_kisi_telefonu: '',
+    izinler: [], avans_kesintiler: [], prim_kazanclar: [], zimmetler: [], pdks_kayitlari: [], dosyalar: [],
+    izin_hakedis: null, mesailer: [], mesai_carpanlari: null
 };
 
 const selectedPersonel = ref(JSON.parse(JSON.stringify(emptyPersonel)));
@@ -180,6 +183,12 @@ const savePersonel = async () => {
             telefon: selectedPersonel.value.telefon || '',
             gec_kalma_bildirimi: selectedPersonel.value.gec_kalma_bildirimi ?? false,
             dogum_tarihi: selectedPersonel.value.dogum_tarihi || null,
+            puantaj_parametre_id: selectedPersonel.value.puantaj_parametre_id || null,
+            tc_no: selectedPersonel.value.tc_no || null,
+            iban_no: selectedPersonel.value.iban_no || null,
+            adres: selectedPersonel.value.adres || null,
+            acil_kisi_adi: selectedPersonel.value.acil_kisi_adi || null,
+            acil_kisi_telefonu: selectedPersonel.value.acil_kisi_telefonu || null,
         };
 
         if (selectedPersonel.value.id) {
@@ -226,6 +235,139 @@ const deletePersonel = () => {
     });
 };
 
+// ===== ZİMMET YÖNETİMİ =====
+const yeniZimmet = ref({ kategori: '', bolum_adi: '', aciklama: '', verilis_tarihi: new Date().toISOString().slice(0,10) });
+
+const reloadPersonelDetail = async () => {
+    if (!selectedPersonel.value.id) return;
+    try {
+        const res = await axios.get(route('personeller.show', selectedPersonel.value.id), {
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        if (res.data.personel) {
+            Object.assign(selectedPersonel.value, res.data.personel);
+        }
+    } catch (e) { console.error(e); }
+};
+
+const zimmetEkle = async () => {
+    if (!yeniZimmet.value.aciklama) { Swal.fire('Uyarı', 'Açıklama zorunludur.', 'warning'); return; }
+    if (!selectedPersonel.value.id) { Swal.fire('Uyarı', 'Önce personel seçiniz.', 'warning'); return; }
+    try {
+        await axios.post(route('personel-zimmet.store'), {
+            personel_id: selectedPersonel.value.id,
+            ...yeniZimmet.value
+        });
+        yeniZimmet.value = { kategori: '', bolum_adi: '', aciklama: '', verilis_tarihi: new Date().toISOString().slice(0,10) };
+        await reloadPersonelDetail();
+        Swal.fire({ title: 'Başarılı!', text: 'Zimmet eklendi.', icon: 'success', timer: 1500 });
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Zimmet eklenemedi.', 'error');
+    }
+};
+
+const zimmetSil = (z) => {
+    Swal.fire({
+        title: 'Zimmet Sil', text: `"${z.aciklama}" zimmeti silinecek. Emin misiniz?`,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
+        confirmButtonText: 'Sil', cancelButtonText: 'İptal'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                await axios.delete(route('personel-zimmet.destroy', z.id));
+                await reloadPersonelDetail();
+                Swal.fire({ title: 'Silindi!', text: 'Zimmet silindi.', icon: 'success', timer: 1500 });
+            } catch (e) {
+                Swal.fire('Hata', e.response?.data?.message || 'Silinemedi.', 'error');
+            }
+        }
+    });
+};
+
+const zimmetIade = (z) => {
+    Swal.fire({
+        title: 'Zimmet İade', text: `"${z.aciklama}" iade edilecek. Emin misiniz?`,
+        icon: 'question', showCancelButton: true, confirmButtonColor: '#f59e0b',
+        confirmButtonText: 'İade Et', cancelButtonText: 'İptal'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                await axios.post(route('personel-zimmet.iade', z.id));
+                await reloadPersonelDetail();
+                Swal.fire({ title: 'İade Edildi!', text: 'Zimmet iade edildi.', icon: 'success', timer: 1500 });
+            } catch (e) {
+                Swal.fire('Hata', e.response?.data?.message || 'İade edilemedi.', 'error');
+            }
+        }
+    });
+};
+
+// ===== MESAİ YÖNETİMİ =====
+const yeniMesai = ref({ tarih: new Date().toISOString().slice(0,10), ilk_giris: '', son_cikis: '', toplam_calisma_suresi: 0, fazla_mesai_dakika: 0 });
+
+const mesaiEkle = async () => {
+    if (!yeniMesai.value.fazla_mesai_dakika || yeniMesai.value.fazla_mesai_dakika <= 0) { Swal.fire('Uyarı', 'Fazla mesai dakikası giriniz.', 'warning'); return; }
+    if (!selectedPersonel.value.id) { Swal.fire('Uyarı', 'Önce personel seçiniz.', 'warning'); return; }
+    try {
+        await axios.post(route('mesai.store'), {
+            personel_id: selectedPersonel.value.id,
+            ...yeniMesai.value
+        });
+        yeniMesai.value = { tarih: new Date().toISOString().slice(0,10), ilk_giris: '', son_cikis: '', toplam_calisma_suresi: 0, fazla_mesai_dakika: 0 };
+        await reloadPersonelDetail();
+        Swal.fire({ title: 'Başarılı!', text: 'Mesai eklendi.', icon: 'success', timer: 1500 });
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Mesai eklenemedi.', 'error');
+    }
+};
+
+const mesaiGuncelle = async (m, yeniDakika) => {
+    const dk = parseInt(yeniDakika);
+    if (isNaN(dk) || dk < 0) return;
+    try {
+        await axios.put(route('mesai.update', m.id), { fazla_mesai_dakika: dk });
+        m.fazla_mesai_dakika = dk;
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Güncellenemedi.', 'error');
+    }
+};
+
+const mesaiSil = (m) => {
+    Swal.fire({
+        title: 'Mesai Sil', text: `${formatTarih(m.tarih)} tarihli mesai silinecek. Emin misiniz?`,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
+        confirmButtonText: 'Sil', cancelButtonText: 'İptal'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                await axios.delete(route('mesai.destroy', m.id));
+                await reloadPersonelDetail();
+                Swal.fire({ title: 'Silindi!', text: 'Mesai silindi.', icon: 'success', timer: 1500 });
+            } catch (e) {
+                Swal.fire('Hata', e.response?.data?.message || 'Silinemedi.', 'error');
+            }
+        }
+    });
+};
+
+// Aylık ücretten otomatik günlük ücret ve saat ücretlerini hesapla
+const hesaplaUcretler = () => {
+    const aylik = parseFloat(String(selectedPersonel.value.aylik_ucret).replace(',', '.')) || 0;
+    if (aylik > 0) {
+        const gunluk = aylik / 30;
+        const saatlik = gunluk / 7.5;
+        selectedPersonel.value.gunluk_ucret = gunluk.toFixed(2);
+        selectedPersonel.value.saat_1 = saatlik.toFixed(2);
+        selectedPersonel.value.saat_2 = (saatlik * 1.5).toFixed(2);
+        selectedPersonel.value.saat_3 = (saatlik * 2.0).toFixed(2);
+    } else {
+        selectedPersonel.value.gunluk_ucret = '';
+        selectedPersonel.value.saat_1 = '';
+        selectedPersonel.value.saat_2 = '';
+        selectedPersonel.value.saat_3 = '';
+    }
+};
+
 const formatTarih = (t) => {
     if (!t) return '';
     return new Date(t).toLocaleDateString('tr-TR');
@@ -235,9 +377,149 @@ const formatTutar = (t) => {
     return Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
 };
 
+// Dakikayı saat:dakika formatına çevir
+const dakikaToSaat = (dk) => {
+    if (!dk || dk <= 0) return '0:00';
+    const s = Math.floor(dk / 60);
+    const d = dk % 60;
+    return `${s}:${String(d).padStart(2, '0')}`;
+};
+
+// Toplam mesai saati
+const mesaiToplamSaat = computed(() => {
+    const toplam = filtreliMesailer.value.reduce((acc, m) => acc + (m.fazla_mesai_dakika || 0), 0);
+    return dakikaToSaat(toplam);
+});
+
 // Resim yükleme
 const resimInput = ref(null);
+const dosyaInput = ref(null);
 const isUploading = ref(false);
+
+// Tarih Filtresi
+const now = new Date();
+const filtreBaslangic = ref(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10));
+const filtreBitis = ref(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0,10));
+const aktifFiltre = ref('ay');
+
+const filtreUygula = (tip) => {
+    aktifFiltre.value = tip;
+    const bugun = new Date();
+    if (tip === 'gun') {
+        const t = bugun.toISOString().slice(0,10);
+        filtreBaslangic.value = t;
+        filtreBitis.value = t;
+    } else if (tip === 'hafta') {
+        const day = bugun.getDay() || 7;
+        const mon = new Date(bugun); mon.setDate(bugun.getDate() - day + 1);
+        const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+        filtreBaslangic.value = mon.toISOString().slice(0,10);
+        filtreBitis.value = sun.toISOString().slice(0,10);
+    } else if (tip === 'ay') {
+        filtreBaslangic.value = new Date(bugun.getFullYear(), bugun.getMonth(), 1).toISOString().slice(0,10);
+        filtreBitis.value = new Date(bugun.getFullYear(), bugun.getMonth() + 1, 0).toISOString().slice(0,10);
+    } else if (tip === 'yil') {
+        filtreBaslangic.value = bugun.getFullYear() + '-01-01';
+        filtreBitis.value = bugun.getFullYear() + '-12-31';
+    } else if (tip === 'tumu') {
+        filtreBaslangic.value = '2020-01-01';
+        filtreBitis.value = '2099-12-31';
+    }
+};
+
+const tarihAralikIcinde = (tarihStr) => {
+    if (!tarihStr) return false;
+    const t = tarihStr.substring(0, 10);
+    return t >= filtreBaslangic.value && t <= filtreBitis.value;
+};
+
+// Filtrelenmiş veriler
+const filtreliPdksKayitlari = computed(() => {
+    return (selectedPersonel.value.pdks_kayitlari || []).filter(k => tarihAralikIcinde(k.kayit_tarihi));
+});
+const filtreliMesailer = computed(() => {
+    return (selectedPersonel.value.mesailer || []).filter(m => tarihAralikIcinde(m.tarih));
+});
+const filtreliIzinler = computed(() => {
+    return (selectedPersonel.value.izinler || []).filter(iz => tarihAralikIcinde(iz.tarih));
+});
+const filtreliAvanslar = computed(() => {
+    return (selectedPersonel.value.avans_kesintiler || []).filter(a => tarihAralikIcinde(a.tarih));
+});
+const filtreliPrimler = computed(() => {
+    return (selectedPersonel.value.prim_kazanclar || []).filter(p => tarihAralikIcinde(p.tarih));
+});
+
+// TC Kimlik No doğrulama
+const tcNoDogrula = () => {
+    const tc = selectedPersonel.value.tc_no;
+    if (!tc) return;
+    if (tc.length !== 11 || !/^\d{11}$/.test(tc) || tc[0] === '0') {
+        Swal.fire('Uyarı', 'Geçersiz TC Kimlik No. 11 haneli ve 0 ile başlamamalı.', 'warning');
+        return;
+    }
+    // TC algoritma kontrolü
+    let tek = 0, cift = 0;
+    for (let i = 0; i < 9; i++) { if (i % 2 === 0) tek += +tc[i]; else cift += +tc[i]; }
+    const d10 = ((tek * 7) - cift) % 10;
+    let toplam = 0; for (let i = 0; i < 10; i++) toplam += +tc[i];
+    if (+tc[9] !== (d10 < 0 ? d10 + 10 : d10) || +tc[10] !== toplam % 10) {
+        Swal.fire('Uyarı', 'TC Kimlik No algoritma kontrolünden geçemedi.', 'warning');
+    }
+};
+
+// IBAN doğrulama
+const ibanDogrula = () => {
+    let iban = (selectedPersonel.value.iban_no || '').replace(/\s/g, '').toUpperCase();
+    if (!iban) return;
+    if (!iban.startsWith('TR')) { Swal.fire('Uyarı', 'IBAN "TR" ile başlamalı.', 'warning'); return; }
+    if (iban.length !== 26) { Swal.fire('Uyarı', 'Türk IBAN 26 karakter olmalı (TR + 24 hane).', 'warning'); return; }
+    selectedPersonel.value.iban_no = iban;
+};
+
+// Dosya yükleme
+const dosyaYukle = async (event) => {
+    const file = event.target.files[0];
+    if (!file || !selectedPersonel.value.id) return;
+    const formData = new FormData();
+    formData.append('dosya', file);
+    formData.append('personel_id', selectedPersonel.value.id);
+    try {
+        isUploading.value = true;
+        await axios.post(route('personel-dosya.store'), formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await reloadPersonelDetail();
+        Swal.fire({ title: 'Başarılı!', text: 'Dosya yüklendi.', icon: 'success', timer: 1500 });
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Dosya yüklenemedi.', 'error');
+    } finally {
+        isUploading.value = false;
+        if (dosyaInput.value) dosyaInput.value.value = '';
+    }
+};
+
+const dosyaSil = (d) => {
+    Swal.fire({
+        title: 'Dosya Sil', text: `"${d.dosya_adi}" silinecek. Emin misiniz?`,
+        icon: 'warning', showCancelButton: true, confirmButtonColor: '#d33',
+        confirmButtonText: 'Sil', cancelButtonText: 'İptal'
+    }).then(async (result) => {
+        if (result.isConfirmed) {
+            try {
+                await axios.delete(route('personel-dosya.destroy', d.id));
+                await reloadPersonelDetail();
+                Swal.fire({ title: 'Silindi!', icon: 'success', timer: 1500 });
+            } catch (e) { Swal.fire('Hata', 'Silinemedi.', 'error'); }
+        }
+    });
+};
+
+const formatBoyut = (bytes) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
 
 const triggerResimSec = () => {
     if (!selectedPersonel.value.id) {
@@ -319,6 +601,29 @@ const uploadResim = async (event) => {
                                 class="tab-btn" :class="{'tab-active': activeTab === 'not'}">Notlar</button>
                             <button @click="activeTab = 'zimmet'"
                                 class="tab-btn" :class="{'tab-active': activeTab === 'zimmet'}">Zimmet</button>
+                            <button @click="activeTab = 'mesai'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'mesai'}">Mesailer</button>
+                            <button @click="activeTab = 'dosya'"
+                                class="tab-btn" :class="{'tab-active': activeTab === 'dosya'}">Dosyalar</button>
+                        </div>
+
+                        <!-- Tarih Filtresi — tüm sekmeler için geçerli, sabit konum -->
+                        <div class="flex items-center gap-1 px-3 py-1.5 bg-gray-50 border-b border-gray-300">
+                            <div class="flex gap-0.5 mr-2">
+                                <button @click="filtreUygula('gun')" class="px-2 py-0.5 text-[10px] rounded border transition"
+                                    :class="aktifFiltre === 'gun' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Bugün</button>
+                                <button @click="filtreUygula('hafta')" class="px-2 py-0.5 text-[10px] rounded border transition"
+                                    :class="aktifFiltre === 'hafta' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Hafta</button>
+                                <button @click="filtreUygula('ay')" class="px-2 py-0.5 text-[10px] rounded border transition"
+                                    :class="aktifFiltre === 'ay' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Ay</button>
+                                <button @click="filtreUygula('yil')" class="px-2 py-0.5 text-[10px] rounded border transition"
+                                    :class="aktifFiltre === 'yil' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Yıl</button>
+                                <button @click="filtreUygula('tumu')" class="px-2 py-0.5 text-[10px] rounded border transition"
+                                    :class="aktifFiltre === 'tumu' ? 'bg-gray-700 text-white border-gray-700' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Tümü</button>
+                            </div>
+                            <input v-model="filtreBaslangic" type="date" class="text-[10px] border border-gray-300 rounded px-1 py-0.5" @change="aktifFiltre = 'ozel'" />
+                            <span class="text-[10px] text-gray-400">—</span>
+                            <input v-model="filtreBitis" type="date" class="text-[10px] border border-gray-300 rounded px-1 py-0.5" @change="aktifFiltre = 'ozel'" />
                         </div>
 
                         <!-- İçerik -->
@@ -329,7 +634,7 @@ const uploadResim = async (event) => {
                             </div>
 
                             <!-- ÖZLÜK -->
-                            <div v-else-if="activeTab === 'ozluk'" class="space-y-3">
+                            <div v-if="!isLoading && activeTab === 'ozluk'" class="space-y-3">
                                 <!-- Alt Sekme -->
                                 <div class="flex gap-1 mb-2">
                                     <button @click="activeSubTab = 'genel'" class="subtab-btn" :class="{'subtab-active': activeSubTab === 'genel'}">Genel</button>
@@ -402,9 +707,21 @@ const uploadResim = async (event) => {
                                                         <option v-for="s in getTanimSecenekleri('hesap_gurubu')" :key="s.kod" :value="s.aciklama">{{ s.kod }} - {{ s.aciklama }}</option>
                                                     </select>
                                                 </div>
+                                                <div class="form-group">
+                                                    <label>Puantaj Tablosu</label>
+                                                    <select v-model="selectedPersonel.puantaj_parametre_id" class="form-input">
+                                                        <option :value="null">Seçiniz</option>
+                                                        <option v-for="p in gunlukPuantajParametreleri" :key="p.id" :value="p.id">{{ p.ad }}</option>
+                                                    </select>
+                                                </div>
                                                 <div class="form-group"><label>E-Posta</label><input v-model="selectedPersonel.email" type="email" class="form-input" placeholder="ornek@mail.com" /></div>
                                                 <div class="form-group"><label>Telefon</label><input v-model="selectedPersonel.telefon" class="form-input" placeholder="05XX XXX XX XX" /></div>
                                                 <div class="form-group"><label>Doğum Tarihi</label><input v-model="selectedPersonel.dogum_tarihi" type="date" class="form-input" /></div>
+                                                <div class="form-group"><label>TC Kimlik No</label><input v-model="selectedPersonel.tc_no" class="form-input" maxlength="11" placeholder="11 haneli TC No" @blur="tcNoDogrula" /></div>
+                                                <div class="form-group"><label>IBAN No</label><input v-model="selectedPersonel.iban_no" class="form-input" maxlength="34" placeholder="TR..." @blur="ibanDogrula" /></div>
+                                                <div class="form-group"><label>Acil Kişi Adı</label><input v-model="selectedPersonel.acil_kisi_adi" class="form-input" placeholder="İsim Soyisim" /></div>
+                                                <div class="form-group"><label>Acil Kişi Tel.</label><input v-model="selectedPersonel.acil_kisi_telefonu" class="form-input" placeholder="05XX XXX XX XX" /></div>
+                                                <div class="form-group col-span-4"><label>Adres</label><input v-model="selectedPersonel.adres" class="form-input" placeholder="Açık adres" /></div>
                                                 <div class="form-group col-span-2">
                                                     <label>Geç Kalma Bildirimi</label>
                                                     <div class="flex items-center mt-1">
@@ -425,11 +742,26 @@ const uploadResim = async (event) => {
                                 <div v-if="activeSubTab === 'ozluk_sub'">
                                     <div class="grid grid-cols-4 gap-x-3 gap-y-2">
                                         <div class="form-group"><label>AGİ</label><input v-model="selectedPersonel.agi" class="form-input" /></div>
-                                        <div class="form-group"><label>Aylık Ücret</label><input v-model="selectedPersonel.aylik_ucret" type="number" class="form-input text-right" /></div>
-                                        <div class="form-group"><label>Günlük Ücret</label><input v-model="selectedPersonel.gunluk_ucret" type="number" class="form-input text-right" /></div>
-                                        <div class="form-group"><label>Saat 1</label><input v-model="selectedPersonel.saat_1" type="number" class="form-input text-right" /></div>
-                                        <div class="form-group"><label>Saat 2</label><input v-model="selectedPersonel.saat_2" type="number" class="form-input text-right" /></div>
-                                        <div class="form-group"><label>Saat 3</label><input v-model="selectedPersonel.saat_3" type="number" class="form-input text-right" /></div>
+                                        <div class="form-group">
+                                            <label>Aylık Ücret</label>
+                                            <input v-model.lazy="selectedPersonel.aylik_ucret" type="number" step="any" class="form-input text-right" placeholder="50000" @change="hesaplaUcretler" />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Günlük Ücret <span class="text-[9px] text-gray-400">(aylık/30)</span></label>
+                                            <input :value="selectedPersonel.gunluk_ucret" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Saat 1 <span class="text-[9px] text-gray-400">(günlük/7.5)</span></label>
+                                            <input :value="selectedPersonel.saat_1" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Saat 2 <span class="text-[9px] text-gray-400">(x1.5)</span></label>
+                                            <input :value="selectedPersonel.saat_2" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Saat 3 <span class="text-[9px] text-gray-400">(x2.0)</span></label>
+                                            <input :value="selectedPersonel.saat_3" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
+                                        </div>
                                         <div class="form-group"><label>Giriş Tarihi</label><input v-model="selectedPersonel.giris_tarihi" type="date" class="form-input" /></div>
                                         <div class="form-group"><label>Çıkış Tarihi</label><input v-model="selectedPersonel.cikis_tarihi" type="date" class="form-input" /></div>
                                     </div>
@@ -443,33 +775,61 @@ const uploadResim = async (event) => {
                                         <th>Tarih</th><th>Saat</th><th>İşlem</th><th>Durum</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="k in (selectedPersonel.pdks_kayitlari || [])" :key="k.id">
+                                        <tr v-for="k in filtreliPdksKayitlari" :key="k.id"
+                                            :class="{'!bg-amber-50': k.izinli_mi}">
                                             <td>{{ formatTarih(k.kayit_tarihi) }}</td>
-                                            <td>{{ k.kayit_tarihi ? k.kayit_tarihi.substring(11,16) : '' }}</td>
-                                            <td><span :class="k.islem_tipi === 'Giriş' ? 'text-green-600' : 'text-red-600'" class="font-semibold">{{ k.islem_tipi }}</span></td>
-                                            <td>Başarılı</td>
+                                            <td>{{ k.izinli_mi ? '' : (k.kayit_tarihi ? k.kayit_tarihi.substring(11,16) : '') }}</td>
+                                            <td>
+                                                <span v-if="!k.izinli_mi" :class="k.islem_tipi === 'Giriş' ? 'text-green-600' : 'text-red-600'" class="font-semibold">{{ k.islem_tipi }}</span>
+                                            </td>
+                                            <td>
+                                                <span v-if="k.izinli_mi" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-300">
+                                                    ⚠ İZİNLİ <span v-if="k.izin_aciklama" class="font-normal">({{ k.izin_aciklama }})</span>
+                                                </span>
+                                                <span v-else class="text-green-600">Başarılı</span>
+                                            </td>
                                         </tr>
-                                        <tr v-if="!(selectedPersonel.pdks_kayitlari || []).length"><td colspan="4" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
+                                        <tr v-if="!filtreliPdksKayitlari.length"><td colspan="4" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
                                     </tbody>
                                 </table>
                             </div>
 
                             <!-- İZİN -->
                             <div v-else-if="activeTab === 'izin'">
+                                <!-- İzin Hakediş Özeti -->
+                                <div v-if="selectedPersonel.izin_hakedis" class="mb-3 p-2 bg-green-50 rounded border border-green-200 text-xs">
+                                    <div class="grid grid-cols-5 gap-2 text-center">
+                                        <div><span class="text-gray-500">Kıdem</span><div class="font-bold text-green-700">{{ selectedPersonel.izin_hakedis.kidem_yil }} yıl</div></div>
+                                        <div><span class="text-gray-500">Yıllık Hak</span><div class="font-bold text-blue-700">{{ selectedPersonel.izin_hakedis.yillik_hak }} gün</div></div>
+                                        <div><span class="text-gray-500">Bu Yıl Kullanılan</span><div class="font-bold text-orange-600">{{ selectedPersonel.izin_hakedis.bu_yil_kullanilan }} gün</div></div>
+                                        <div><span class="text-gray-500">Kalan</span><div class="font-bold text-lg" :class="selectedPersonel.izin_hakedis.kalan > 0 ? 'text-green-700' : 'text-red-600'">{{ selectedPersonel.izin_hakedis.kalan }} gün</div></div>
+                                        <div><span class="text-gray-500">Toplam Kullanılan</span><div class="font-bold text-gray-600">{{ selectedPersonel.izin_hakedis.toplam_kullanilan }} gün</div></div>
+                                    </div>
+                                    <div class="mt-1 text-[10px] text-gray-400 text-center">İş Kanunu m.53 — 1-5 yıl: 14 gün, 5-15 yıl: 20 gün, 15+ yıl: 26 gün</div>
+                                </div>
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>Tarih</th><th>Tatil Tipi</th><th>İzin Tipi</th><th>Giriş</th><th>Çıkış</th><th>Açıklama</th>
+                                        <th>İzin Türü</th><th>Başlangıç</th><th>Bitiş</th><th>Gün</th><th>Tip</th><th>Durum</th><th>Açıklama</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="iz in (selectedPersonel.izinler || [])" :key="iz.id">
+                                        <tr v-for="iz in filtreliIzinler" :key="iz.id">
+                                            <td class="font-medium">{{ iz.izin_turu?.ad || '-' }}</td>
                                             <td>{{ formatTarih(iz.tarih) }}</td>
-                                            <td>{{ iz.tatil_tipi }}</td>
-                                            <td>{{ iz.izin_tipi }}</td>
-                                            <td>{{ iz.giris_saati }}</td>
-                                            <td>{{ iz.cikis_saati }}</td>
-                                            <td>{{ iz.aciklama }}</td>
+                                            <td>{{ iz.bitis_tarihi ? formatTarih(iz.bitis_tarihi) : '-' }}</td>
+                                            <td class="text-center">{{ iz.gun_sayisi }}</td>
+                                            <td>{{ iz.izin_tipi === 'gunluk' ? 'Günlük' : 'Saatlik' }}</td>
+                                            <td>
+                                                <span :class="{
+                                                    'bg-green-100 text-green-700 border-green-300': iz.durum === 'onaylandi',
+                                                    'bg-yellow-100 text-yellow-700 border-yellow-300': iz.durum === 'beklemede',
+                                                    'bg-red-100 text-red-700 border-red-300': iz.durum === 'reddedildi'
+                                                }" class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border">
+                                                    {{ iz.durum === 'onaylandi' ? '✓ Onaylandı' : iz.durum === 'beklemede' ? '⏳ Beklemede' : '✗ Reddedildi' }}
+                                                </span>
+                                            </td>
+                                            <td>{{ iz.aciklama || '-' }}</td>
                                         </tr>
-                                        <tr v-if="!(selectedPersonel.izinler || []).length"><td colspan="6" class="text-center text-gray-400 py-6">İzin kaydı yok</td></tr>
+                                        <tr v-if="!filtreliIzinler.length"><td colspan="7" class="text-center text-gray-400 py-6">İzin kaydı yok</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -478,16 +838,18 @@ const uploadResim = async (event) => {
                             <div v-else-if="activeTab === 'avans'">
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>Tarih</th><th>Tutar</th><th>Açıklama</th><th>Bordro Alanı</th>
+                                        <th>Tarih</th><th>Tutar</th><th>Taksit</th><th>Toplam Tutar</th><th>Açıklama</th><th>Bordro Alanı</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="a in (selectedPersonel.avans_kesintiler || [])" :key="a.id">
+                                        <tr v-for="a in filtreliAvanslar" :key="a.id">
                                             <td>{{ formatTarih(a.tarih) }}</td>
-                                            <td class="text-right">{{ formatTutar(a.tutar) }}</td>
-                                            <td>{{ a.aciklama }}</td>
-                                            <td>{{ a.bordro_alani }}</td>
+                                            <td class="text-right font-medium">{{ formatTutar(a.tutar) }}</td>
+                                            <td class="text-center">{{ a.taksit_no && a.toplam_taksit ? a.taksit_no + '/' + a.toplam_taksit : '-' }}</td>
+                                            <td class="text-right">{{ a.toplam_tutar ? formatTutar(a.toplam_tutar) : '-' }}</td>
+                                            <td>{{ a.aciklama || '-' }}</td>
+                                            <td>{{ a.bordro_alani || '-' }}</td>
                                         </tr>
-                                        <tr v-if="!(selectedPersonel.avans_kesintiler || []).length"><td colspan="4" class="text-center text-gray-400 py-6">Avans/kesinti kaydı yok</td></tr>
+                                        <tr v-if="!filtreliAvanslar.length"><td colspan="6" class="text-center text-gray-400 py-6">Avans/kesinti kaydı yok</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -496,16 +858,18 @@ const uploadResim = async (event) => {
                             <div v-else-if="activeTab === 'prim'">
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>Tarih</th><th>Tutar</th><th>Açıklama</th><th>Bordro Alanı</th>
+                                        <th>Tarih</th><th>Tutar</th><th>Taksit</th><th>Toplam Tutar</th><th>Açıklama</th><th>Bordro Alanı</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="p in (selectedPersonel.prim_kazanclar || [])" :key="p.id">
+                                        <tr v-for="p in filtreliPrimler" :key="p.id">
                                             <td>{{ formatTarih(p.tarih) }}</td>
-                                            <td class="text-right">{{ formatTutar(p.tutar) }}</td>
-                                            <td>{{ p.aciklama }}</td>
-                                            <td>{{ p.bordro_alani }}</td>
+                                            <td class="text-right font-medium">{{ formatTutar(p.tutar) }}</td>
+                                            <td class="text-center">{{ p.taksit_no && p.toplam_taksit ? p.taksit_no + '/' + p.toplam_taksit : '-' }}</td>
+                                            <td class="text-right">{{ p.toplam_tutar ? formatTutar(p.toplam_tutar) : '-' }}</td>
+                                            <td>{{ p.aciklama || '-' }}</td>
+                                            <td>{{ p.bordro_alani || '-' }}</td>
                                         </tr>
-                                        <tr v-if="!(selectedPersonel.prim_kazanclar || []).length"><td colspan="4" class="text-center text-gray-400 py-6">Prim/kazanç kaydı yok</td></tr>
+                                        <tr v-if="!filtreliPrimler.length"><td colspan="6" class="text-center text-gray-400 py-6">Prim/kazanç kaydı yok</td></tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -519,19 +883,146 @@ const uploadResim = async (event) => {
 
                             <!-- ZİMMET -->
                             <div v-else-if="activeTab === 'zimmet'">
+                                <!-- Yeni Zimmet Ekleme Formu -->
+                                <div class="mb-3 p-2 bg-blue-50 rounded border border-blue-200">
+                                    <div class="grid grid-cols-5 gap-2">
+                                        <div><input v-model="yeniZimmet.kategori" class="form-input text-xs" placeholder="Kategori (Bilgisayar, Telefon...)" /></div>
+                                        <div><input v-model="yeniZimmet.bolum_adi" class="form-input text-xs" placeholder="Bölüm" /></div>
+                                        <div><input v-model="yeniZimmet.aciklama" class="form-input text-xs" placeholder="Açıklama *" /></div>
+                                        <div><input v-model="yeniZimmet.verilis_tarihi" type="date" class="form-input text-xs" /></div>
+                                        <div>
+                                            <button @click="zimmetEkle" class="w-full bg-blue-600 text-white text-xs px-3 py-1.5 rounded hover:bg-blue-700 transition">
+                                                + Zimmet Ekle
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>Kategori</th><th>Bölüm</th><th>Açıklama</th><th>Veriliş Tarihi</th><th>İade Tarihi</th>
+                                        <th>Kategori</th><th>Bölüm</th><th>Açıklama</th><th>Veriliş Tarihi</th><th>İade Tarihi</th><th class="w-24">İşlem</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="z in (selectedPersonel.zimmetler || [])" :key="z.id">
+                                        <tr v-for="z in (selectedPersonel.zimmetler || [])" :key="z.id"
+                                            :class="{'!bg-gray-100 text-gray-500': z.iade_tarihi}">
                                             <td>{{ z.kategori }}</td>
-                                            <td>{{ z.bolum_adi }}</td>
-                                            <td>{{ z.aciklama }}</td>
+                                            <td>{{ z.bolum_adi || '-' }}</td>
+                                            <td class="font-medium">{{ z.aciklama }}</td>
                                             <td>{{ formatTarih(z.verilis_tarihi) }}</td>
-                                            <td>{{ z.iade_tarihi ? formatTarih(z.iade_tarihi) : '-' }}</td>
+                                            <td>
+                                                <span v-if="z.iade_tarihi" class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-200 text-gray-600 border border-gray-300">
+                                                    ✓ {{ formatTarih(z.iade_tarihi) }}
+                                                </span>
+                                                <span v-else class="text-green-600 text-xs font-medium">Aktif</span>
+                                            </td>
+                                            <td>
+                                                <div class="flex gap-1">
+                                                    <button v-if="!z.iade_tarihi" @click="zimmetIade(z)" class="text-orange-600 hover:text-orange-800 text-xs font-medium" title="İade Et">📤 İade</button>
+                                                    <button @click="zimmetSil(z)" class="text-red-600 hover:text-red-800 text-xs font-medium" title="Sil">🗑</button>
+                                                </div>
+                                            </td>
                                         </tr>
-                                        <tr v-if="!(selectedPersonel.zimmetler || []).length"><td colspan="5" class="text-center text-gray-400 py-6">Zimmet kaydı yok</td></tr>
+                                        <tr v-if="!(selectedPersonel.zimmetler || []).length"><td colspan="6" class="text-center text-gray-400 py-6">Zimmet kaydı yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- MESAİLER -->
+                            <div v-else-if="activeTab === 'mesai'">
+                                <!-- Puantaj parametresi bilgisi -->
+                                <div v-if="selectedPersonel.mesai_carpanlari" class="mb-3 p-2 bg-indigo-50 rounded border border-indigo-200 text-xs">
+                                    <div class="font-bold text-indigo-700 mb-1">{{ selectedPersonel.mesai_carpanlari.parametre_adi }}</div>
+                                    <div class="grid grid-cols-4 gap-2 text-gray-600">
+                                        <div>Günlük: <strong>{{ selectedPersonel.mesai_carpanlari.gunluk_saat }} saat</strong></div>
+                                        <div>Fazla Mesai: <strong class="text-orange-600">x{{ selectedPersonel.mesai_carpanlari.fazla_mesai }}</strong></div>
+                                        <div>Tatil Mesai: <strong class="text-red-600">x{{ selectedPersonel.mesai_carpanlari.tatil_mesai }}</strong></div>
+                                        <div>Resmi Tatil: <strong class="text-red-700">x{{ selectedPersonel.mesai_carpanlari.resmi_tatil_mesai }}</strong></div>
+                                    </div>
+                                </div>
+                                <div v-else class="mb-3 p-2 bg-yellow-50 rounded border border-yellow-300 text-xs text-yellow-700">
+                                    ⚠ Puantaj parametresi atanmamış — mesai hesaplaması yapılamaz.
+                                </div>
+
+                                <!-- Manuel Mesai Ekleme Formu -->
+                                <div class="mb-3 p-2 bg-orange-50 rounded border border-orange-200">
+                                    <div class="grid grid-cols-6 gap-2 items-end">
+                                        <div><label class="text-[10px] text-gray-500">Tarih</label><input v-model="yeniMesai.tarih" type="date" class="form-input text-xs" /></div>
+                                        <div><label class="text-[10px] text-gray-500">Giriş</label><input v-model="yeniMesai.ilk_giris" type="time" class="form-input text-xs" /></div>
+                                        <div><label class="text-[10px] text-gray-500">Çıkış</label><input v-model="yeniMesai.son_cikis" type="time" class="form-input text-xs" /></div>
+                                        <div><label class="text-[10px] text-gray-500">Çalışma (dk)</label><input v-model="yeniMesai.toplam_calisma_suresi" type="number" class="form-input text-xs" /></div>
+                                        <div><label class="text-[10px] text-gray-500">Fazla Mesai (dk)*</label><input v-model="yeniMesai.fazla_mesai_dakika" type="number" class="form-input text-xs" /></div>
+                                        <div>
+                                            <button @click="mesaiEkle" class="w-full bg-orange-600 text-white text-xs px-3 py-1.5 rounded hover:bg-orange-700 transition">
+                                                + Mesai Ekle
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Toplam mesai özeti -->
+                                <div v-if="(selectedPersonel.mesailer || []).length" class="mb-2 text-xs text-gray-500">
+                                    Toplam: <strong class="text-indigo-700">{{ mesaiToplamSaat }}</strong> saat fazla mesai
+                                    ({{ (selectedPersonel.mesailer || []).length }} gün)
+                                </div>
+
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Tarih</th><th>Giriş</th><th>Çıkış</th><th>Toplam Çalışma</th><th>Fazla Mesai</th><th>Durum</th><th class="w-20">İşlem</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="m in filtreliMesailer" :key="m.id">
+                                            <td>{{ formatTarih(m.tarih) }}</td>
+                                            <td>{{ m.ilk_giris ? m.ilk_giris.substring(11, 16) : '-' }}</td>
+                                            <td>{{ m.son_cikis ? m.son_cikis.substring(11, 16) : '-' }}</td>
+                                            <td class="text-center">{{ dakikaToSaat(m.toplam_calisma_suresi) }}</td>
+                                            <td class="text-center">
+                                                <input :value="m.fazla_mesai_dakika" type="number" class="w-16 text-center text-xs border rounded px-1 py-0.5 font-bold text-orange-600"
+                                                    @change="mesaiGuncelle(m, $event.target.value)" title="Fazla mesai dakikasını düzenle" />
+                                            </td>
+                                            <td>
+                                                <span :class="{
+                                                    'bg-green-100 text-green-700': m.durum === 'geldi',
+                                                    'bg-yellow-100 text-yellow-700': m.durum === 'geç kaldı',
+                                                    'bg-red-100 text-red-700': m.durum === 'erken_cikis'
+                                                }" class="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold border">
+                                                    {{ m.durum }}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <button @click="mesaiSil(m)" class="text-red-600 hover:text-red-800 text-xs font-medium" title="Sil">🗑</button>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="!filtreliMesailer.length"><td colspan="7" class="text-center text-gray-400 py-6">Fazla mesai kaydı yok</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- DOSYALAR -->
+                            <div v-else-if="activeTab === 'dosya'">
+                                <div class="mb-3 flex items-center gap-3">
+                                    <input type="file" ref="dosyaInput" @change="dosyaYukle" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" />
+                                    <button @click="$refs.dosyaInput.click()" class="bg-blue-600 text-white text-xs px-4 py-1.5 rounded hover:bg-blue-700 transition" :disabled="isUploading || !selectedPersonel.id">
+                                        {{ isUploading ? 'Yükleniyor...' : '📁 Dosya Yükle' }}
+                                    </button>
+                                    <span class="text-[10px] text-gray-400">PDF, JPG, PNG, DOC, DOCX, XLS, XLSX — Max 10MB</span>
+                                </div>
+                                <table class="data-table">
+                                    <thead><tr>
+                                        <th>Dosya Adı</th><th>Tür</th><th>Boyut</th><th>Yüklenme Tarihi</th><th class="w-24">İşlem</th>
+                                    </tr></thead>
+                                    <tbody>
+                                        <tr v-for="d in (selectedPersonel.dosyalar || [])" :key="d.id">
+                                            <td class="font-medium">{{ d.dosya_adi }}</td>
+                                            <td><span class="uppercase text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-bold">{{ d.dosya_tipi }}</span></td>
+                                            <td>{{ formatBoyut(d.boyut) }}</td>
+                                            <td>{{ formatTarih(d.created_at) }}</td>
+                                            <td>
+                                                <div class="flex gap-2">
+                                                    <a :href="d.url" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium" title="Görüntüle">👁</a>
+                                                    <button @click="dosyaSil(d)" class="text-red-600 hover:text-red-800 text-xs font-medium" title="Sil">🗑</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="!(selectedPersonel.dosyalar || []).length"><td colspan="5" class="text-center text-gray-400 py-6">Dosya yok</td></tr>
                                     </tbody>
                                 </table>
                             </div>

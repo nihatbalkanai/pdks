@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Inertia\Inertia;
+use App\Services\PdksHesaplamaServisi;
 
 class PersonelCalismaPlanController extends Controller
 {
@@ -76,6 +77,12 @@ class PersonelCalismaPlanController extends Controller
                 'aciklama' => $validated['aciklama'] ?? null,
             ]
         );
+
+        // İzin olarak işaretlendiyse İzin Yönetimi'ne de yansıt
+        if ($validated['tur'] === 'izin') {
+            $servis = new PdksHesaplamaServisi();
+            $servis->planIzinSenkron((int) $personelId, $validated['tarih'], $firma_id, $validated['aciklama'] ?? null);
+        }
 
         return response()->json(['success' => true]);
     }

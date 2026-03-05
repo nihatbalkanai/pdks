@@ -28,6 +28,7 @@ class Personel extends Model
         'firma_id',
         'sube_id',
         'servis_id',
+        'puantaj_parametre_id',
         'kart_no',
         'ad_soyad', // Still keeping ad_soyad for backward compatibility
         'ad',
@@ -56,6 +57,11 @@ class Personel extends Model
         'telefon',
         'gec_kalma_bildirimi',
         'dogum_tarihi',
+        'tc_no',
+        'iban_no',
+        'adres',
+        'acil_kisi_adi',
+        'acil_kisi_telefonu',
     ];
 
     public function izinler()
@@ -83,6 +89,11 @@ class Personel extends Model
         return $this->hasMany(PersonelZimmet::class, 'personel_id');
     }
 
+    public function dosyalar()
+    {
+        return $this->hasMany(PersonelDosya::class, 'personel_id');
+    }
+
     public function firma()
     {
         return $this->belongsTo(Firma::class, 'firma_id');
@@ -96,5 +107,10 @@ class Personel extends Model
     public function servis()
     {
         return $this->belongsTo(Servis::class);
+    }
+
+    public function puantajParametresi()
+    {
+        return $this->belongsTo(GunlukPuantajParametresi::class, 'puantaj_parametre_id');
     }
 }
