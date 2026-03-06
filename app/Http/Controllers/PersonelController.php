@@ -66,8 +66,8 @@ class PersonelController extends Controller
             'kart_no' => 'nullable|string|max:100',
             'ad' => 'required|string|max:100',
             'soyad' => 'required|string|max:100',
-            'ad_soyad' => 'nullable|string|max:255', // Optional alias
-            'sicil_no' => 'required|string|max:100',
+            'ad_soyad' => 'nullable|string|max:255',
+            'sicil_no' => 'nullable|string|max:100',
             'ssk_no' => 'nullable|string|max:100',
             'unvan' => 'nullable|string|max:100',
             'sirket' => 'nullable|string|max:255',
@@ -78,6 +78,7 @@ class PersonelController extends Controller
             'hesap_gurubu' => 'nullable|string|max:255',
             'agi' => 'nullable|string|max:100',
             'aylik_ucret' => 'nullable|numeric',
+            'elden_odeme' => 'nullable|numeric',
             'gunluk_ucret' => 'nullable|numeric',
             'saat_1' => 'nullable|numeric',
             'saat_2' => 'nullable|numeric',
@@ -92,19 +93,53 @@ class PersonelController extends Controller
             'dogum_tarihi' => 'nullable|date',
             'puantaj_parametre_id' => 'nullable|exists:gunluk_puantaj_parametreleri,id',
             'aylik_puantaj_parametre_id' => 'nullable|exists:aylik_puantaj_parametreleri,id',
+            'tc_no' => 'nullable|digits:11',
+            'iban_no' => 'nullable|string|max:34',
+            'adres' => 'nullable|string',
+            'acil_kisi_adi' => 'nullable|string|max:255',
+            'acil_kisi_telefonu' => 'nullable|string|max:20',
+            'yemek_tipi' => 'nullable|in:kart,ucret',
+            'yemek_kart_no' => 'nullable|string|max:50',
+            'yemek_ucreti' => 'nullable|numeric|min:0',
+            'ulasim_tipi' => 'nullable|in:servis,yol_parasi',
+            'servis_plaka' => 'nullable|string|max:20',
+            'yol_parasi' => 'nullable|numeric|min:0',
         ]);
 
-        if (empty($validated['ad_soyad'])) {
-            $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
+        \Log::info('PersonelController@store ISTEK', ['data' => $validated]);
+
+        try {
+            if (empty($validated['ad_soyad'])) {
+                $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
+            }
+
+            // Sicil no boşsa otomatik ata
+            if (empty($validated['sicil_no'])) {
+                $sonSicil = Personel::withoutGlobalScopes()->max('id') ?? 0;
+                $validated['sicil_no'] = str_pad($sonSicil + 1, 5, '0', STR_PAD_LEFT);
+            }
+
+            $firma_id = Auth::user()->firma_id ?? 1;
+
+            $personel = Personel::create(array_merge($validated, [
+                'firma_id' => $firma_id
+            ]));
+
+            \Log::info('PersonelController@store BASARILI', ['personel_id' => $personel->id]);
+
+            return response()->json(['success' => true, 'personel' => $personel]);
+
+        } catch (\Exception $e) {
+            \Log::error('PersonelController@store BEKLENMEDIK HATA', [
+                'message' => $e->getMessage(),
+                'file'    => $e->getFile(),
+                'line'    => $e->getLine(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Kayıt hatası: ' . $e->getMessage()
+            ], 500);
         }
-
-        $firma_id = Auth::user()->firma_id ?? 1;
-
-        $personel = Personel::create(array_merge($validated, [
-            'firma_id' => $firma_id
-        ]));
-
-        return response()->json(['success' => true, 'personel' => $personel]);
     }
 
     public function show($id)
@@ -245,11 +280,17 @@ class PersonelController extends Controller
 
     public function update(Request $request, Personel $personel)
     {
+        \Log::info('PersonelController@update ISTEK', [
+            'personel_id' => $personel->id,
+            'data' => $request->all()
+        ]);
+
+        try {
         $validated = $request->validate([
             'kart_no' => 'nullable|string|max:100',
             'ad' => 'required|string|max:100',
             'soyad' => 'required|string|max:100',
-            'sicil_no' => 'required|string|max:100',
+            'sicil_no' => 'nullable|string|max:100',
             'ssk_no' => 'nullable|string|max:100',
             'unvan' => 'nullable|string|max:100',
             'sirket' => 'nullable|string|max:255',
@@ -260,6 +301,7 @@ class PersonelController extends Controller
             'hesap_gurubu' => 'nullable|string|max:255',
             'agi' => 'nullable|string|max:100',
             'aylik_ucret' => 'nullable|numeric',
+            'elden_odeme' => 'nullable|numeric',
             'gunluk_ucret' => 'nullable|numeric',
             'saat_1' => 'nullable|numeric',
             'saat_2' => 'nullable|numeric',
@@ -274,7 +316,7 @@ class PersonelController extends Controller
             'dogum_tarihi' => 'nullable|date',
             'puantaj_parametre_id' => 'nullable|exists:gunluk_puantaj_parametreleri,id',
             'aylik_puantaj_parametre_id' => 'nullable|exists:aylik_puantaj_parametreleri,id',
-            'tc_no' => 'nullable|string|size:11',
+            'tc_no' => 'nullable|digits:11',
             'iban_no' => 'nullable|string|max:34',
             'adres' => 'nullable|string',
             'acil_kisi_adi' => 'nullable|string|max:255',
@@ -287,12 +329,39 @@ class PersonelController extends Controller
             'yol_parasi' => 'nullable|numeric|min:0',
         ]);
 
-        $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
+            $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
 
-        $personel->update($validated);
-        $personel->refresh();
+            // Sicil no boşsa mevcut değeri korumak için güncellemeden çıkar
+            if (empty($validated['sicil_no'])) {
+                unset($validated['sicil_no']);
+            }
 
-        return response()->json(['success' => true, 'personel' => $personel]);
+            $personel->update($validated);
+            $personel->refresh();
+
+            \Log::info('PersonelController@update BASARILI', ['personel_id' => $personel->id]);
+
+            return response()->json(['success' => true, 'personel' => $personel]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            \Log::warning('PersonelController@update VALIDATION HATASI', [
+                'personel_id' => $personel->id,
+                'errors' => $e->errors()
+            ]);
+            return response()->json(['success' => false, 'errors' => $e->errors()], 422);
+        } catch (\Exception $e) {
+            \Log::error('PersonelController@update BEKLENMEDIK HATA', [
+                'personel_id' => $personel->id,
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Kayıt hatası: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

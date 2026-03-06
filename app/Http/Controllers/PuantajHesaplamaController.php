@@ -19,16 +19,14 @@ use Illuminate\Support\Facades\Auth;
 class PuantajHesaplamaController extends Controller
 {
     // =============================================
-    // MUHASEBE STANDARTLARI:
-    // Ay = 30 gün (her ay, şubat dahil)
+    // MUHASEBE STANDARTLARI (Kullanıcı Ayarlarından Dinamik Çekilir):
     // Aylık Saat = 225 (aylik_puantaj_parametre'den)
-    // Günlük Ücret = Aylık Ücret / 30
-    // Saatlik Ücret = Aylık Ücret / 225
-    // Normal Çalışma Ücreti = Günlük Ücret × Gün
-    // Tam ay çalışan = 30 gün otomatik
+    // Günlük Saat = 7.5 (aylik_puantaj_parametre'den)
+    // Ay Standartı (Gün) = 225 / 7.5 = 30 gün
+    // Günlük Ücret = Aylık Ücret / Standart Ay Günü
     // =============================================
 
-    private const STANDART_AY_GUN = 30;
+    private const FM_TOLERANS_DAKIKA_DEFAULT = 5; // FM tolerans varsayılan (DB'den okunur)
 
     public function index()
     {
@@ -98,10 +96,13 @@ class PuantajHesaplamaController extends Controller
                     ->first();
             }
 
-            // === STANDART DEĞERLER ===
-            $standartAyGun = self::STANDART_AY_GUN; // 30
+            // === STANDART DEĞERLER (VERİTABANINDAN) ===
             $aylikStandartSaat = $aylikParam && $aylikParam->aylik_calisma_saati > 0
                 ? (float)$aylikParam->aylik_calisma_saati : 225;
+            
+            // Standart Ay Günü (Yurtiçi SGK için 30'dur. Ancak yurtdışı firmalar için dinamik okunur)
+            $standartAyGun = $aylikParam && $aylikParam->standart_ay_gunu > 0 
+                ? (int)$aylikParam->standart_ay_gunu : 30;
 
             // Günlük çalışma saati (vardiya parametresinden)
             $gunlukCalismaSaat = 9.0; // varsayılan
@@ -116,14 +117,17 @@ class PuantajHesaplamaController extends Controller
 
             $molaSuresi = $puantajParam ? (int)($puantajParam->mola_suresi ?? 0) : 0;
 
-            // Çarpanlar
+            // Çarpanlar ve parametreler (veritabanından)
             $fm50Carpan = $aylikParam ? (float)$aylikParam->fazla_mesai_carpani : 1.5;
             $fm100Carpan = $aylikParam ? (float)$aylikParam->tatil_mesai_carpani : 2.0;
+            $fmToleransDakika = $aylikParam ? (int)($aylikParam->fazla_mesai_tolerans_dakika ?? self::FM_TOLERANS_DAKIKA_DEFAULT) : self::FM_TOLERANS_DAKIKA_DEFAULT;
+            $gunFarkHesapla = $aylikParam ? (bool)($aylikParam->gun_fark_hesapla ?? true) : true;
+            $sskToplamaDahil = $aylikParam ? (bool)($aylikParam->ssk_rapor_toplama_dahil ?? false) : false;
 
-            // === ÜCRET HESABI (30 GÜN / 225 SAAT STANDARDI) ===
+            // === ÜCRET HESABI (ÖRNEK 30 GÜN / 225 SAAT STANDARDI ÜZERİNDEN DİNAMİK) ===
             $aylikUcret = (float)($personel->aylik_ucret ?? 0);
-            $gunlukUcret = $aylikUcret / $standartAyGun;        // Maaş / 30
-            $saatlikUcret = $aylikUcret / $aylikStandartSaat;    // Maaş / 225
+            $gunlukUcret = $aylikUcret / $standartAyGun;         // Örn: Maaş / 30
+            $saatlikUcret = $aylikUcret / $aylikStandartSaat;    // Örn: Maaş / 225
 
             // === İZİNLERİ AL ===
             $izinler = PersonelIzin::withoutGlobalScopes()
@@ -264,8 +268,10 @@ class PuantajHesaplamaController extends Controller
                     $normalCalismaGun++;
 
                     // Fazla mesai kontrolü (günlük standart saatten fazla çalışma)
-                    if ($calismaDakika > $gunlukCalismaDakika) {
-                        $fm50Dakika += ($calismaDakika - $gunlukCalismaDakika);
+                    // Tolerans: DB parametresinden (varsayılan: 5 dk)
+                    $fmFark = $calismaDakika - $gunlukCalismaDakika;
+                    if ($fmFark > $fmToleransDakika) {
+                        $fm50Dakika += $fmFark;
                     }
 
                     // Geç gelme kontrolü
@@ -290,23 +296,32 @@ class PuantajHesaplamaController extends Controller
                 ];
             }
 
-            // ===== 30 GÜN STANDARDI UYGULAMASI =====
-            // Personel tam ay çalıştıysa (tüm takvim günleri aktif) → 30 gün kabul et
+            // ===== STANDART AY (ÖRNEĞİN 30 GÜN) UYGULAMASI =====
+            // Gösterim günü = Gerçek takvim günü (Şubat=28, Mart=31 vb.)
+            // Hesaplama günü = Muhasebe standardı (Örn: 30 gün)
             $tamAyMi = ($toplamTakvimGunu >= $ayTakvimGunu);
-            if ($tamAyMi && $devamsizlikGun == 0 && $ucretsizIzinGun == 0) {
-                // Tam ay, eksiksiz çalışmış → 30 gün
+            $normalCalismaGunGosterim = $normalCalismaGun; // Gerçek gün (gösterim)
+
+            if ($tamAyMi && $devamsizlikGun == 0 && $ucretsizIzinGun == 0 && $ucretliIzinGun == 0) {
+                // Tam ay, eksiksiz → Gösterim: takvim günü, Hesaplama: Standart Ay Günü
+                $normalCalismaGunGosterim = $toplamTakvimGunu;
                 $normalCalismaGun = $standartAyGun;
             } elseif ($tamAyMi) {
-                // Tam ay ama devamsızlık/ücretsiz izin var
-                // Normal gün = 30 - devamsız - ücretsiz izin
+                // Tam ay ama devamsızlık/ücretsiz izin/ücretli izin var
+                // Gösterim: takvim günü - tüm izin/devamsızlık (Excel formatı)
+                $normalCalismaGunGosterim = $toplamTakvimGunu - $devamsizlikGun - $ucretsizIzinGun - $ucretliIzinGun;
+                // Hesaplama: Standart gün standardı - kesintiler
                 $normalCalismaGun = $standartAyGun - $devamsizlikGun - $ucretsizIzinGun;
+            } else {
+                // Kısmi ay: her iki değer de gerçek gün
+                $normalCalismaGunGosterim = $normalCalismaGun;
             }
-            // Kısmi ay: normalCalismaGun olduğu gibi kalır (takvim günü bazlı)
 
             // ===== ÜCRET HESAPLAMALARI =====
-            // Normal Çalışma: Ücret = (Maaş/30) × Gün
-            $normalSaat = $normalCalismaGun * $gunlukCalismaSaat;
-            $normalUcret = $gunlukUcret * $normalCalismaGun;
+            // Normal Çalışma: Ücret = (Maaş/30) × Gösterim Gün (takvim günü bazlı, Excel uyumlu)
+            $normalSaat = $normalCalismaGun * $gunlukCalismaSaat;           // Dahili hesaplama (30 gün bazlı)
+            $normalSaatGosterim = $normalCalismaGunGosterim * $gunlukCalismaSaat; // Gösterim saati (takvim günü bazlı)
+            $normalUcret = $gunlukUcret * $normalCalismaGunGosterim;        // Ücret de takvim günü bazlı
 
             // FM %50: saatlik × çarpan × saat
             $fm50SaatDecimal = round($fm50Dakika / 60, 2);
@@ -316,31 +331,37 @@ class PuantajHesaplamaController extends Controller
             $fm100SaatDecimal = round($fm100Dakika / 60, 2);
             $fm100Ucret = $saatlikUcret * $fm100Carpan * $fm100SaatDecimal;
 
-            // Devamsızlık: Ücret kesintisi = (Maaş/30) × devamsız gün
+            // Devamsızlık: Ücret kesintisi = (Maaş/StandartGün) × devamsız gün
             $devSaat = $devamsizlikGun * $gunlukCalismaSaat;
             $devUcret = $gunlukUcret * $devamsizlikGun;
 
-            // Ücretsiz İzin: Ücret kesintisi = (Maaş/30) × gün
+            // Ücretsiz İzin: Gün ve saat gösterilir, ücret kesintisi = (Maaş/StandartGün) × gün
             $uiSaat = $ucretsizIzinGun * $gunlukCalismaSaat;
             $uiUcret = $gunlukUcret * $ucretsizIzinGun;
 
-            // Ücretli İzin: Ücret = (Maaş/30) × gün
+            // Ücretli İzin: Ücret = (Maaş/StandartGün) × gün
             $uciSaat = $ucretliIzinGun * $gunlukCalismaSaat;
             $uciUcret = $gunlukUcret * $ucretliIzinGun;
 
-            // Hafta Tatili: Bilgi amaçlı (30 gün standardında normal güne dahil)
+            // Hafta Tatili: Bilgi amaçlı (Excel'de gösterilmez, normal güne dahil)
             $htSaat = 0;
             $htUcret = 0;
 
-            // Gün Fark (eksik saat farkı)
-            $gunFarkSaat = 0;
-            $gunFarkUcret = 0;
+            // Gün Fark = Muhasebe standardı (Örn: 30) ile ayın takvim günü arasındaki fark
+            // Ayar: gun_fark_hesapla (DB parametresi)
+            // Örn: Şubat: 30-28=2, Mart: 30-31=0(max), Nisan: 30-30=0
+            $gunFarkGun = 0;
+            if ($gunFarkHesapla && $tamAyMi) {
+                $gunFarkGun = max(0, $standartAyGun - $ayTakvimGunu);
+            }
+            $gunFarkUcret = $gunlukUcret * $gunFarkGun;
 
-            // TOPLAM = Normal + FM50 + FM100 + Ücretli İzin + Ek Ödeme + SSK Rapor Ödemesi
-            //        - Devamsızlık - Ücretsiz İzin - Avans - Kesinti
+            // TOPLAM (Bankaya Yatan)
+            // SSK dahil/hariç ayarı: ssk_rapor_toplama_dahil (DB parametresi)
             $toplam = $normalUcret + $fm50Ucret + $fm100Ucret + $uciUcret
-                    + $toplamEkOdeme + $toplamSskOdemesi
-                    - $devUcret - $uiUcret - $toplamAvans - $toplamKesinti;
+                    + $toplamEkOdeme + $gunFarkUcret
+                    + ($sskToplamaDahil ? $toplamSskOdemesi : 0)
+                    - $devUcret - $toplamAvans - $toplamKesinti;
 
             // Format fonksiyonları
             $fmt = fn($dakika) => sprintf('%02d:%02d', intdiv(abs((int)round($dakika)), 60), abs((int)round($dakika)) % 60);
@@ -372,13 +393,14 @@ class PuantajHesaplamaController extends Controller
                 'ad_soyad' => $personel->ad . ' ' . $personel->soyad,
                 'bolum' => $personel->bolum ?? '-',
                 'net_maas' => $fmtPara($aylikUcret),
+                'elden_odeme' => $fmtPara($personel->elden_odeme ?? 0),
                 'giris_tarihi' => $personel->giris_tarihi ? Carbon::parse($personel->giris_tarihi)->format('d.m.Y') : '',
                 'cikis_tarihi' => $personel->cikis_tarihi ? Carbon::parse($personel->cikis_tarihi)->format('d.m.Y') : '',
                 'gunler' => $gunler,
                 'bordro' => [
                     'normal_calisma' => [
-                        'gun' => number_format($normalCalismaGun, 2, ',', '.'),
-                        'saat' => $fmtSaat($normalSaat),
+                        'gun' => number_format($normalCalismaGunGosterim, 2, ',', '.'),
+                        'saat' => $fmtSaat($normalSaatGosterim),
                         'ucret' => $fmtPara($normalUcret),
                     ],
                     'fazla_mesai_50' => [
@@ -415,6 +437,7 @@ class PuantajHesaplamaController extends Controller
                     'ssk_rapor_odemesi' => $fmtPara($toplamSskOdemesi),
                     'kesinti' => $fmtPara($toplamKesinti),
                     'gun_fark' => $fmtPara($gunFarkUcret),
+                    'elden_odeme' => $fmtPara($personel->elden_odeme ?? 0),
                     'toplam' => $fmtPara($toplam),
                 ],
                 'ozet' => [

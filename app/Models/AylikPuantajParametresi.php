@@ -18,10 +18,14 @@ class AylikPuantajParametresi extends Model
         'aylik_calisma_saati',
         'haftalik_calisma_saati',
         'gunluk_calisma_saati',
+        'standart_ay_gunu',
         'eksik_gun_kesintisi_yapilacak_mi',
         'fazla_mesai_carpani',
         'tatil_mesai_carpani',
         'resmi_tatil_mesai_carpani',
+        'fazla_mesai_tolerans_dakika',
+        'gun_fark_hesapla',
+        'ssk_rapor_toplama_dahil',
         'durum',
     ];
 
@@ -30,10 +34,14 @@ class AylikPuantajParametresi extends Model
         'durum' => 'boolean',
         'aylik_calisma_saati' => 'integer',
         'haftalik_calisma_saati' => 'integer',
+        'standart_ay_gunu' => 'integer',
         'gunluk_calisma_saati' => 'decimal:2',
         'fazla_mesai_carpani' => 'decimal:2',
         'tatil_mesai_carpani' => 'decimal:2',
         'resmi_tatil_mesai_carpani' => 'decimal:2',
+        'fazla_mesai_tolerans_dakika' => 'integer',
+        'gun_fark_hesapla' => 'boolean',
+        'ssk_rapor_toplama_dahil' => 'boolean',
     ];
 
     protected static function booted()

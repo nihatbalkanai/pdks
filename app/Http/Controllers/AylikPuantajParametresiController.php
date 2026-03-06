@@ -29,10 +29,14 @@ class AylikPuantajParametresiController extends Controller
             'aylik_calisma_saati'              => 'required|numeric',
             'haftalik_calisma_saati'           => 'required|numeric',
             'gunluk_calisma_saati'             => 'required|numeric',
+            'standart_ay_gunu'                 => 'required|integer',
             'eksik_gun_kesintisi_yapilacak_mi' => 'required|boolean',
             'fazla_mesai_carpani'              => 'required|numeric',
             'tatil_mesai_carpani'              => 'required|numeric',
             'resmi_tatil_mesai_carpani'        => 'required|numeric',
+            'fazla_mesai_tolerans_dakika'      => 'nullable|integer',
+            'gun_fark_hesapla'                 => 'nullable|boolean',
+            'ssk_rapor_toplama_dahil'          => 'nullable|boolean',
             'durum'                            => 'boolean',
         ]);
 
@@ -51,10 +55,14 @@ class AylikPuantajParametresiController extends Controller
             'aylik_calisma_saati'              => 'required|numeric',
             'haftalik_calisma_saati'           => 'required|numeric',
             'gunluk_calisma_saati'             => 'required|numeric',
+            'standart_ay_gunu'                 => 'required|integer',
             'eksik_gun_kesintisi_yapilacak_mi' => 'required|boolean',
             'fazla_mesai_carpani'              => 'required|numeric',
             'tatil_mesai_carpani'              => 'required|numeric',
             'resmi_tatil_mesai_carpani'        => 'required|numeric',
+            'fazla_mesai_tolerans_dakika'      => 'nullable|integer',
+            'gun_fark_hesapla'                 => 'nullable|boolean',
+            'ssk_rapor_toplama_dahil'          => 'nullable|boolean',
             'durum'                            => 'boolean',
         ]);
 

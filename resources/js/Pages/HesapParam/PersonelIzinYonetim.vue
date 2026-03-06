@@ -25,9 +25,16 @@ const durumLabel = { beklemede: 'Beklemede', onaylandi: 'Onaylandı', reddedildi
 const seciliPersonel = computed(() => props.personeller.find(p => p.id === seciliPersonelId.value));
 const filtreliPersoneller = computed(() => {
     if (!arama.value) return props.personeller;
-    const q = arama.value.toLowerCase();
-    return props.personeller.filter(p => `${p.ad} ${p.soyad} ${p.sicil_no || ''}`.toLowerCase().includes(q));
+    const q = arama.value.toLocaleLowerCase('tr-TR');
+    return props.personeller.filter(p => `${p.ad} ${p.soyad} ${p.sicil_no || ''}`.toLocaleLowerCase('tr-TR').includes(q));
 });
+
+const toTitleCase = (str) => {
+    if (!str) return '';
+    return str
+        .toLocaleLowerCase('tr-TR')
+        .replace(/(^|\s)(\S)/g, (m, space, char) => space + char.toLocaleUpperCase('tr-TR'));
+};
 
 // Özet istatistikler
 const ozet = computed(() => {
@@ -218,8 +225,7 @@ watch(() => form.izin_turu_id, () => {
                         <div v-for="p in filtreliPersoneller" :key="p.id" @click="seciliPersonelId = p.id"
                             class="px-2 py-1.5 text-xs cursor-pointer border-b border-gray-200 hover:bg-green-50 transition"
                             :class="seciliPersonelId === p.id ? '!bg-green-100 font-semibold border-l-2 border-l-green-500' : ''">
-                            <div class="font-medium truncate">{{ p.ad }} {{ p.soyad }}</div>
-                            <div class="text-[10px] text-gray-500">{{ p.sicil_no || '-' }}</div>
+                            <div class="font-medium truncate">{{ toTitleCase(p.ad + ' ' + p.soyad) }}</div>
                         </div>
                     </div>
                 </div>
@@ -234,7 +240,7 @@ watch(() => form.izin_turu_id, () => {
                         <!-- Üst Bar -->
                         <div class="border-b border-gray-300 bg-white px-4 py-2 flex items-center justify-between">
                             <div class="flex items-center gap-3">
-                                <span class="font-bold text-sm">{{ seciliPersonel?.ad }} {{ seciliPersonel?.soyad }}</span>
+                                <span class="font-bold text-sm">{{ toTitleCase((seciliPersonel?.ad || '') + ' ' + (seciliPersonel?.soyad || '')) }}</span>
                                 <select v-model="yil" class="text-xs rounded border-gray-300 py-1">
                                     <option v-for="y in [2024,2025,2026,2027]" :key="y" :value="y">{{ y }}</option>
                                 </select>

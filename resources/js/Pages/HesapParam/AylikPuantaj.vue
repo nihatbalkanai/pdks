@@ -19,10 +19,14 @@ const form = reactive({
     aylik_calisma_saati: 225,
     haftalik_calisma_saati: 45,
     gunluk_calisma_saati: 7.5,
+    standart_ay_gunu: 30,
     eksik_gun_kesintisi_yapilacak_mi: true,
     fazla_mesai_carpani: 1.5,
     tatil_mesai_carpani: 2.0,
     resmi_tatil_mesai_carpani: 2.0,
+    fazla_mesai_tolerans_dakika: 5,
+    gun_fark_hesapla: true,
+    ssk_rapor_toplama_dahil: false,
     durum: true,
 });
 
@@ -31,10 +35,14 @@ const resetForm = () => {
     form.aylik_calisma_saati = 225;
     form.haftalik_calisma_saati = 45;
     form.gunluk_calisma_saati = 7.5;
+    form.standart_ay_gunu = 30;
     form.eksik_gun_kesintisi_yapilacak_mi = true;
     form.fazla_mesai_carpani = 1.5;
     form.tatil_mesai_carpani = 2.0;
     form.resmi_tatil_mesai_carpani = 2.0;
+    form.fazla_mesai_tolerans_dakika = 5;
+    form.gun_fark_hesapla = true;
+    form.ssk_rapor_toplama_dahil = false;
     form.durum = true;
     formErrors.value = {};
 };
@@ -47,10 +55,14 @@ const openModal = (parametre = null) => {
         form.aylik_calisma_saati = parametre.aylik_calisma_saati;
         form.haftalik_calisma_saati = parametre.haftalik_calisma_saati;
         form.gunluk_calisma_saati = parametre.gunluk_calisma_saati;
+        form.standart_ay_gunu = parametre.standart_ay_gunu ?? 30;
         form.eksik_gun_kesintisi_yapilacak_mi = !!parametre.eksik_gun_kesintisi_yapilacak_mi;
         form.fazla_mesai_carpani = parametre.fazla_mesai_carpani;
         form.tatil_mesai_carpani = parametre.tatil_mesai_carpani;
         form.resmi_tatil_mesai_carpani = parametre.resmi_tatil_mesai_carpani;
+        form.fazla_mesai_tolerans_dakika = parametre.fazla_mesai_tolerans_dakika ?? 5;
+        form.gun_fark_hesapla = parametre.gun_fark_hesapla ?? true;
+        form.ssk_rapor_toplama_dahil = parametre.ssk_rapor_toplama_dahil ?? false;
         form.durum = !!parametre.durum;
     } else {
         isEditing.value = false;
@@ -149,6 +161,7 @@ const deleteParametre = (id) => {
                                 <div class="text-gray-500">Aylık Çalışma:</div><div class="font-medium text-right">{{ param.aylik_calisma_saati }} Saat</div>
                                 <div class="text-gray-500">Haftalık Çalışma:</div><div class="font-medium text-right">{{ param.haftalik_calisma_saati }} Saat</div>
                                 <div class="text-gray-500">Günlük Çalışma:</div><div class="font-medium text-right">{{ param.gunluk_calisma_saati }} Saat</div>
+                                <div class="text-gray-500 text-[11px] leading-tight">Standart Ay (Maaş Böleni):</div><div class="font-medium text-right">{{ param.standart_ay_gunu ?? 30 }} Gün</div>
                                 <div class="col-span-2 text-gray-500 flex items-center justify-between mt-1">
                                     Eksik Gün Kesintisi: 
                                     <span :class="param.eksik_gun_kesintisi_yapilacak_mi ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded' : 'text-green-600 bg-green-50 px-2 py-0.5 rounded'">
@@ -169,6 +182,21 @@ const deleteParametre = (id) => {
                                 <div class="flex items-center justify-between">
                                     <span class="text-gray-500">Resmi Tatil Mesai:</span>
                                     <span class="bg-red-50 text-red-700 font-bold px-1.5 py-0.5 rounded border border-red-100">x{{ param.resmi_tatil_mesai_carpani }}</span>
+                                </div>
+                            </div>
+                            <div class="mt-2 border-t pt-2 border-gray-100">
+                                <h4 class="font-semibold text-gray-600 mb-2 underline decoration-gray-300">Hesaplama Kuralları</h4>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-gray-500">FM Toleransı:</span>
+                                    <span class="font-medium text-gray-800">{{ param.fazla_mesai_tolerans_dakika ?? 5 }} Dk</span>
+                                </div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-gray-500">Gün Farkı İlav. (T.Ay):</span>
+                                    <span :class="(param.gun_fark_hesapla ?? true) ? 'text-green-600' : 'text-red-500'" class="font-medium">{{ (param.gun_fark_hesapla ?? true) ? 'Aktif' : 'Pasif' }}</span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-500">SSK Rapor Toplama Dahil:</span>
+                                    <span :class="(param.ssk_rapor_toplama_dahil ?? false) ? 'text-green-600' : 'text-gray-500'" class="font-medium">{{ (param.ssk_rapor_toplama_dahil ?? false) ? 'Evet' : 'Hayır' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -203,27 +231,34 @@ const deleteParametre = (id) => {
                         <p class="text-[10px] text-gray-500 mt-1">Bu ad, "Genel Gruplar Çalışma Planı" veya Personel Kartı'ndaki grup/parametre adlarıyla eşleşmelidir.</p>
                     </div>
 
-                    <div class="grid grid-cols-3 gap-3">
+                    <div class="grid grid-cols-4 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Aylık Çalışma</label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Aylık Ç.</label>
                             <div class="relative">
-                                <input v-model="form.aylik_calisma_saati" type="number" step="1" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-10" required>
-                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400">Saat</div>
+                                <input v-model="form.aylik_calisma_saati" type="number" step="1" class="w-full text-xs box-border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-6" required>
+                                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-[10px] text-gray-400">S</div>
                             </div>
                             <div v-if="formErrors.aylik_calisma_saati" class="text-red-500 text-xs mt-1">{{ formErrors.aylik_calisma_saati[0] }}</div>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Haftalık Çalışma</label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Haftalık Ç.</label>
                             <div class="relative">
-                                <input v-model="form.haftalik_calisma_saati" type="number" step="1" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-10" required>
-                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400">Saat</div>
+                                <input v-model="form.haftalik_calisma_saati" type="number" step="1" class="w-full text-xs box-border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-6" required>
+                                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-[10px] text-gray-400">S</div>
                             </div>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-700 mb-1">Günlük Çalışma</label>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Günlük Ç.</label>
                             <div class="relative">
-                                <input v-model="form.gunluk_calisma_saati" type="number" step="0.1" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-10" required>
-                                <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400">Saat</div>
+                                <input v-model="form.gunluk_calisma_saati" type="number" step="0.1" class="w-full text-xs box-border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-6" required>
+                                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-[10px] text-gray-400">S</div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-blue-800 mb-1 truncate" title="Maaşın bölüneceği rakam (Türkiye'de SGK için 30)">Standart Ay</label>
+                            <div class="relative">
+                                <input v-model="form.standart_ay_gunu" type="number" step="1" class="w-full text-xs box-border border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-6 bg-blue-50/30" required>
+                                <div class="absolute inset-y-0 right-0 pr-2 flex items-center pointer-events-none text-[10px] text-gray-400">Gün</div>
                             </div>
                         </div>
                     </div>
@@ -260,6 +295,36 @@ const deleteParametre = (id) => {
                                     <input v-model="form.resmi_tatil_mesai_carpani" type="number" step="0.01" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pl-6" required>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50/50 p-3 rounded border border-blue-100 space-y-3">
+                        <h4 class="text-xs font-bold text-gray-800 border-b border-blue-200 pb-1">İleri Düzey Kurallar</h4>
+                        
+                        <div>
+                            <label class="block text-xs font-semibold text-gray-700 mb-1">Fazla Mesai Toleransı (Dakika)</label>
+                            <input v-model="form.fazla_mesai_tolerans_dakika" type="number" min="0" step="1" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+                            <p class="text-[10px] text-gray-500 mt-1">Bu sürenin altındaki fazla çalışmalar fazla mesai (FM) olarak sayılmaz. Örn: 5 dk</p>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-start">
+                                <input v-model="form.gun_fark_hesapla" type="checkbox" class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                <div class="ml-2 flex flex-col">
+                                    <span class="text-sm text-gray-700 font-medium leading-none">Tam Ay Gün Farkını Ücrete Ekle</span>
+                                    <span class="text-[10px] text-gray-500 mt-1">Eksi aylar için (örn. Şubat 28 gün) standart ay süresine (örn. 30) tamamlama tutarı yansıtılır.</span>
+                                </div>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="flex items-start">
+                                <input v-model="form.ssk_rapor_toplama_dahil" type="checkbox" class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                <div class="ml-2 flex flex-col">
+                                    <span class="text-sm text-gray-700 font-medium leading-none">SSK Rapor Ödemesi Bankaya Yatan Toplama Dahil</span>
+                                    <span class="text-[10px] text-gray-500 mt-1">Genelde devlete ödenir ve işçilerin banka hesabına geçmez, bu nedenle dahil edilmez.</span>
+                                </div>
+                            </label>
                         </div>
                     </div>
 

@@ -45,6 +45,7 @@ class Personel extends Model
         'hesap_gurubu',
         'agi',
         'aylik_ucret',
+        'elden_odeme',
         'gunluk_ucret',
         'saat_1',
         'saat_2',

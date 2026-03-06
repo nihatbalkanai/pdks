@@ -171,10 +171,16 @@ const turRenk = (tur) => {
 
 // Arama
 const arama = ref('');
+const toTitleCase = (str) => {
+    if (!str) return '';
+    return str
+        .toLocaleLowerCase('tr-TR')
+        .replace(/(^|\s)(\S)/g, (m, space, char) => space + char.toLocaleUpperCase('tr-TR'));
+};
 const filtreliPersoneller = computed(() => {
     if (!arama.value) return props.personeller;
-    const q = arama.value.toLowerCase();
-    return props.personeller.filter(p => `${p.ad} ${p.soyad} ${p.sicil_no || ''}`.toLowerCase().includes(q));
+    const q = arama.value.toLocaleLowerCase('tr-TR');
+    return props.personeller.filter(p => `${p.ad} ${p.soyad} ${p.sicil_no || ''}`.toLocaleLowerCase('tr-TR').includes(q));
 });
 </script>
 
@@ -199,8 +205,7 @@ const filtreliPersoneller = computed(() => {
                             @click="seciliPersonelId = p.id"
                             class="px-2 py-1.5 text-xs cursor-pointer border-b border-gray-200 hover:bg-orange-50 transition"
                             :class="seciliPersonelId === p.id ? '!bg-orange-100 font-semibold border-l-2 border-l-orange-500' : ''">
-                            <div class="font-medium truncate">{{ p.ad }} {{ p.soyad }}</div>
-                            <div class="text-[10px] text-gray-500">{{ p.sicil_no || '-' }}</div>
+                            <div class="font-medium truncate">{{ toTitleCase(p.ad + ' ' + p.soyad) }}</div>
                         </div>
                         <div v-if="!filtreliPersoneller.length" class="px-3 py-6 text-center text-gray-400 text-xs">Personel bulunamadı.</div>
                     </div>

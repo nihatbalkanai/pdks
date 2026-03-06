@@ -28,7 +28,7 @@ const isSaving = ref(false);
 const emptyPersonel = {
     id: null, kart_no: '', sicil_no: '', ad: '', soyad: '', ssk_no: '',
     unvan: '', sirket: '', bolum: '', ozel_kod: '', departman: '',
-    servis_kodu: '', hesap_gurubu: '', agi: '', aylik_ucret: '',
+    servis_kodu: '', hesap_gurubu: '', agi: '', aylik_ucret: '', elden_odeme: '',
     gunluk_ucret: '', saat_1: '', saat_2: '', saat_3: '',
     giris_tarihi: '', cikis_tarihi: '', durum: true, notlar: '',
     email: '', telefon: '', gec_kalma_bildirimi: false, resim_yolu: '', puantaj_parametre_id: null,
@@ -88,64 +88,8 @@ const selectPersonel = async (personel) => {
     isLoading.value = false;
 };
 
-// --- OTOMATİK MAAŞ HESAPLAMA ---
-let isAutoCalculating = false;
-
-watch(() => selectedPersonel.value.aylik_ucret, (newVal) => {
-    if (isAutoCalculating) return;
-    if (!newVal) {
-        isAutoCalculating = true;
-        selectedPersonel.value.gunluk_ucret = '';
-        selectedPersonel.value.saat_1 = '';
-        isAutoCalculating = false;
-        return;
-    }
-    
-    // Varsayılan katsayılar
-    let aylikCalismaSaati = 225;
-    let gunLuku = 30; // standart ay 30 gün
-    
-    if (selectedPersonel.value.hesap_gurubu) {
-        const param = props.aylikPuantajParametreleri?.find(p => p.hesap_parametresi_adi === selectedPersonel.value.hesap_gurubu);
-        if (param) {
-            aylikCalismaSaati = param.aylik_calisma_saati || 225;
-            // Günlük saati bulup 30'a bölmek yerine 30 güne bölündüğü varsayılır
-            const gunlukSaat = param.gunluk_calisma_saati || 7.5;
-            gunLuku = aylikCalismaSaati / gunlukSaat;
-        }
-    }
-    
-    isAutoCalculating = true;
-    selectedPersonel.value.gunluk_ucret = (Number(newVal) / 30).toFixed(2);
-    selectedPersonel.value.saat_1 = (Number(newVal) / aylikCalismaSaati).toFixed(2);
-    isAutoCalculating = false;
-});
-
-watch(() => selectedPersonel.value.gunluk_ucret, (newVal) => {
-    if (isAutoCalculating) return;
-    if (!newVal) {
-        isAutoCalculating = true;
-        selectedPersonel.value.aylik_ucret = '';
-        selectedPersonel.value.saat_1 = '';
-        isAutoCalculating = false;
-        return;
-    }
-
-    let aylikCalismaSaati = 225;
-    
-    if (selectedPersonel.value.hesap_gurubu) {
-        const param = props.aylikPuantajParametreleri?.find(p => p.hesap_parametresi_adi === selectedPersonel.value.hesap_gurubu);
-        if (param) {
-            aylikCalismaSaati = param.aylik_calisma_saati || 225;
-        }
-    }
-    
-    isAutoCalculating = true;
-    const aylik = Number(newVal) * 30;
-    selectedPersonel.value.aylik_ucret = aylik.toFixed(2);
-    selectedPersonel.value.saat_1 = (aylik / aylikCalismaSaati).toFixed(2);
-    isAutoCalculating = false;
-});
+// MAAŞ HESAPLAMA LOGIC'i artık sadece hesaplaUcretler fonksiyonunda çalışmaktadır.
+// Bu sayede .10 gibi yuvarlama hataları ve sonsuz döngüler ortadan kaldırılmıştır.
 
 // Yeni personel
 const newPersonel = () => {
@@ -158,7 +102,12 @@ const newPersonel = () => {
 const savePersonel = async () => {
     isSaving.value = true;
     try {
-        // Sadece form alanlarını gönder (ilişki verilerini hariç tut)
+        const parseNum = (val) => {
+            if (val === null || val === undefined || val === '') return null;
+            const parsed = parseFloat(String(val).replace(',', '.'));
+            return isNaN(parsed) ? null : parsed;
+        };
+
         const formData = {
             kart_no: selectedPersonel.value.kart_no || '',
             ad: selectedPersonel.value.ad || '',
@@ -173,11 +122,12 @@ const savePersonel = async () => {
             servis_kodu: selectedPersonel.value.servis_kodu || '',
             hesap_gurubu: selectedPersonel.value.hesap_gurubu || '',
             agi: selectedPersonel.value.agi || '',
-            aylik_ucret: selectedPersonel.value.aylik_ucret || null,
-            gunluk_ucret: selectedPersonel.value.gunluk_ucret || null,
-            saat_1: selectedPersonel.value.saat_1 || null,
-            saat_2: selectedPersonel.value.saat_2 || null,
-            saat_3: selectedPersonel.value.saat_3 || null,
+            aylik_ucret: parseNum(selectedPersonel.value.aylik_ucret),
+            elden_odeme: parseNum(selectedPersonel.value.elden_odeme),
+            gunluk_ucret: parseNum(selectedPersonel.value.gunluk_ucret),
+            saat_1: parseNum(selectedPersonel.value.saat_1),
+            saat_2: parseNum(selectedPersonel.value.saat_2),
+            saat_3: parseNum(selectedPersonel.value.saat_3),
             giris_tarihi: selectedPersonel.value.giris_tarihi || null,
             cikis_tarihi: selectedPersonel.value.cikis_tarihi || null,
             durum: selectedPersonel.value.durum ?? true,
@@ -195,14 +145,23 @@ const savePersonel = async () => {
             acil_kisi_telefonu: selectedPersonel.value.acil_kisi_telefonu || null,
             yemek_tipi: selectedPersonel.value.yemek_tipi || null,
             yemek_kart_no: selectedPersonel.value.yemek_kart_no || null,
-            yemek_ucreti: selectedPersonel.value.yemek_ucreti || null,
+            yemek_ucreti: parseNum(selectedPersonel.value.yemek_ucreti),
             ulasim_tipi: selectedPersonel.value.ulasim_tipi || null,
             servis_plaka: selectedPersonel.value.servis_plaka || null,
-            yol_parasi: selectedPersonel.value.yol_parasi || null,
+            yol_parasi: parseNum(selectedPersonel.value.yol_parasi),
+        };
+
+        const axiosConfig = {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            withCredentials: true,
         };
 
         if (selectedPersonel.value.id) {
-            const res = await axios.put(route('personeller.update', selectedPersonel.value.id), formData);
+            const res = await axios.put(route('personeller.update', selectedPersonel.value.id), formData, axiosConfig);
             // Güncellenen veriyi local listeye yansıt
             const idx = localPersoneller.value.findIndex(p => p.id === selectedPersonel.value.id);
             if (idx !== -1 && res.data.personel) {
@@ -210,7 +169,7 @@ const savePersonel = async () => {
             }
             Swal.fire({ title: 'Başarılı!', text: 'Personel güncellendi.', icon: 'success', timer: 1500 });
         } else {
-            const response = await axios.post(route('personeller.store'), formData);
+            const response = await axios.post(route('personeller.store'), formData, axiosConfig);
             if (response.data.personel) {
                 localPersoneller.value.unshift(response.data.personel);
                 selectedPersonel.value = { ...selectedPersonel.value, ...response.data.personel };
@@ -218,9 +177,21 @@ const savePersonel = async () => {
             Swal.fire({ title: 'Başarılı!', text: 'Yeni personel kaydedildi.', icon: 'success', timer: 1500 });
         }
     } catch (error) {
-        const errors = error.response?.data?.errors;
-        const msg = errors ? Object.values(errors).flat().join('<br>') : (error.response?.data?.message || 'Kaydetme işlemi başarısız oldu.');
-        Swal.fire('Hata!', msg, 'error');
+        // Sunucudan gelen tam hata mesajını göster
+        const responseData = error.response?.data;
+        const errors = responseData?.errors;
+        const serverMsg = responseData?.message;
+        const statusCode = error.response?.status;
+        
+        let msg = 'Kaydetme işlemi başarısız oldu.';
+        if (errors) {
+            msg = Object.values(errors).flat().join('<br>');
+        } else if (serverMsg) {
+            msg = serverMsg;
+        }
+        
+        console.error('Personel kaydet hatası:', { statusCode, responseData, error });
+        Swal.fire('Hata! (' + (statusCode || '?') + ')', msg, 'error');
     } finally {
         isSaving.value = false;
     }
@@ -363,20 +334,55 @@ const mesaiSil = (m) => {
 // Aylık ücretten otomatik günlük ücret ve saat ücretlerini hesapla
 const hesaplaUcretler = () => {
     const aylik = parseFloat(String(selectedPersonel.value.aylik_ucret).replace(',', '.')) || 0;
-    if (aylik > 0) {
-        const gunluk = aylik / 30;
-        const saatlik = gunluk / 7.5;
-        selectedPersonel.value.gunluk_ucret = gunluk.toFixed(2);
-        selectedPersonel.value.saat_1 = saatlik.toFixed(2);
-        selectedPersonel.value.saat_2 = (saatlik * 1.5).toFixed(2);
-        selectedPersonel.value.saat_3 = (saatlik * 2.0).toFixed(2);
-    } else {
+    if (aylik <= 0) {
         selectedPersonel.value.gunluk_ucret = '';
         selectedPersonel.value.saat_1 = '';
         selectedPersonel.value.saat_2 = '';
         selectedPersonel.value.saat_3 = '';
+        return;
     }
+
+    // Seçilen aylık puantaj parametresine göre hesapla
+    let standardAyGunu = 30;
+    let gunlukCalisma = 9; // varsayılan
+    let aylikSaat = standardAyGunu * gunlukCalisma;
+
+    if (selectedPersonel.value.aylik_puantaj_parametre_id) {
+        const param = props.aylikPuantajParametreleri?.find(
+            p => p.id == selectedPersonel.value.aylik_puantaj_parametre_id
+        );
+        if (param) {
+            standardAyGunu = param.standart_ay_gunu || 30;
+            gunlukCalisma = param.gunluk_calisma_saati || 9;
+            aylikSaat = param.aylik_calisma_saati || (standardAyGunu * gunlukCalisma);
+        }
+    }
+
+    const gunluk = aylik / standardAyGunu;
+    const saatlik = aylik / aylikSaat;
+
+    selectedPersonel.value.gunluk_ucret = gunluk.toFixed(2);
+    selectedPersonel.value.saat_1 = saatlik.toFixed(2);
+    selectedPersonel.value.saat_2 = (saatlik * 1.5).toFixed(2);
+    selectedPersonel.value.saat_3 = (saatlik * 2.0).toFixed(2);
 };
+
+// Seçili parametrenin günlük saatini döndür (label için)
+const seciliParamGunlukSaat = computed(() => {
+    if (!selectedPersonel.value.aylik_puantaj_parametre_id) return 9;
+    const param = props.aylikPuantajParametreleri?.find(
+        p => p.id == selectedPersonel.value.aylik_puantaj_parametre_id
+    );
+    return param?.gunluk_calisma_saati || 9;
+});
+
+const seciliParamAyGunu = computed(() => {
+    if (!selectedPersonel.value.aylik_puantaj_parametre_id) return 30;
+    const param = props.aylikPuantajParametreleri?.find(
+        p => p.id == selectedPersonel.value.aylik_puantaj_parametre_id
+    );
+    return param?.standart_ay_gunu || 30;
+});
 
 const formatTarih = (t) => {
     if (!t) return '';
@@ -385,6 +391,14 @@ const formatTarih = (t) => {
 const formatTutar = (t) => {
     if (!t) return '0,00';
     return Number(t).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
+};
+
+// Türkçe büyük/küçük harf dönüşümü (İ→i, I→ı gibi)
+const toTitleCase = (str) => {
+    if (!str) return '';
+    return str
+        .toLocaleLowerCase('tr-TR')
+        .replace(/(^|\s)(\S)/g, (match, space, char) => space + char.toLocaleUpperCase('tr-TR'));
 };
 
 // Dakikayı saat:dakika formatına çevir
@@ -603,8 +617,7 @@ const uploadResim = async (event) => {
                                 class="px-2 py-1.5 text-xs cursor-pointer border-b border-gray-200 hover:bg-blue-50 transition flex items-center"
                                 :class="{'!bg-blue-100 font-semibold border-l-2 border-l-blue-500': selectedPersonel.id === p.id}">
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-medium truncate">{{ p.ad || '' }} {{ p.soyad || '' }}</div>
-                                    <div class="text-[10px] text-gray-500">{{ p.kart_no || '-' }}</div>
+                                    <div class="font-medium truncate capitalize-names">{{ toTitleCase((p.ad || '') + ' ' + (p.soyad || '')) }}</div>
                                 </div>
                             </div>
                             <div v-if="filteredPersoneller.length === 0" class="p-4 text-center text-gray-400 text-xs">Personel bulunamadı</div>
@@ -778,51 +791,96 @@ const uploadResim = async (event) => {
                                 </div>
 
                                 <div v-if="activeSubTab === 'ozluk_sub'">
-                                    <div class="grid grid-cols-4 gap-x-3 gap-y-2">
+                                    <div class="space-y-4">
+                                        
+                                        <!-- Ücret Bilgileri Paneli -->
+                                        <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                                            <h4 class="text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wide border-b border-gray-200 pb-1">💵 Ücret Bilgileri</h4>
+                                            <div class="grid grid-cols-4 gap-3">
+                                                <div class="form-group border border-green-200 bg-green-50 p-2 rounded relative col-span-1">
+                                                    <label class="text-green-800 font-bold mb-1 text-[11px] block">Aylık Net Ücret (Banka + Elden)</label>
+                                                    <input v-model.lazy="selectedPersonel.aylik_ucret" type="number" step="any" class="form-input text-right font-bold text-green-900 border-green-300 w-full" placeholder="50.000" @change="hesaplaUcretler" />
+                                                </div>
+                                                <div class="form-group border border-orange-200 bg-orange-50 p-2 rounded relative col-span-1">
+                                                    <label class="text-orange-800 font-bold mb-1 pb-1 block border-b border-orange-200 text-[11px]" title="Banka harici zarfla ödenen miktar">Zarfla (Elden) Ödenen Miktar</label>
+                                                    <input v-model.lazy="selectedPersonel.elden_odeme" type="number" step="any" class="form-input text-right font-bold text-orange-900 border-orange-300 w-full mt-1" placeholder="10.000" />
+                                                </div>
+                                                <div class="col-span-2 grid grid-cols-4 gap-2 pt-1">
+                                                    <div class="form-group">
+                                                        <label>Günlük <span class="text-[9px] text-gray-400">(/{{ seciliParamAyGunu }})</span></label>
+                                                        <input :value="selectedPersonel.gunluk_ucret" type="number" step="any" class="form-input text-right bg-gray-100 text-xs py-1" readonly />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Saat 1 <span class="text-[9px] text-gray-400">(/{{ seciliParamGunlukSaat }})</span></label>
+                                                        <input :value="selectedPersonel.saat_1" type="number" step="any" class="form-input text-right bg-gray-100 text-xs py-1" readonly />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Saat 2 <span class="text-[9px] text-gray-400">(x1.5)</span></label>
+                                                        <input :value="selectedPersonel.saat_2" type="number" step="any" class="form-input text-right bg-gray-100 text-xs py-1" readonly />
+                                                    </div>
+                                                    <div class="form-group">
+                                                        <label>Saat 3 <span class="text-[9px] text-gray-400">(x2.0)</span></label>
+                                                        <input :value="selectedPersonel.saat_3" type="number" step="any" class="form-input text-right bg-gray-100 text-xs py-1" readonly />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                        <div class="form-group">
-                                            <label>Aylık Ücret</label>
-                                            <input v-model.lazy="selectedPersonel.aylik_ucret" type="number" step="any" class="form-input text-right" placeholder="50000" @change="hesaplaUcretler" />
+                                        <!-- Sözleşme Bilgileri -->
+                                        <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                                            <h4 class="text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wide border-b border-gray-200 pb-1">📅 Sözleşme Tarihleri</h4>
+                                            <div class="grid grid-cols-4 gap-3">
+                                                <div class="form-group col-span-2">
+                                                    <label class="font-semibold text-blue-700">İşe Giriş Tarihi</label>
+                                                    <input v-model="selectedPersonel.giris_tarihi" type="date" class="form-input border-blue-200 focus:border-blue-400" />
+                                                </div>
+                                                <div class="form-group col-span-2">
+                                                    <label class="font-semibold text-red-700">İşten Çıkış Tarihi</label>
+                                                    <input v-model="selectedPersonel.cikis_tarihi" type="date" class="form-input border-red-200 focus:border-red-400" />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="form-group">
-                                            <label>Günlük Ücret <span class="text-[9px] text-gray-400">(aylık/30)</span></label>
-                                            <input :value="selectedPersonel.gunluk_ucret" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
+
+                                        <!-- Yan Haklar -->
+                                        <div class="bg-gray-50 border border-gray-200 rounded p-3">
+                                            <h4 class="text-[11px] font-bold text-gray-500 mb-2 uppercase tracking-wide border-b border-gray-200 pb-1">🎁 Yan Haklar (Yemek & Ulaşım)</h4>
+                                            <div class="grid grid-cols-4 gap-3">
+                                                <!-- Yemek -->
+                                                <div class="form-group">
+                                                    <label>Yemek Tipi</label>
+                                                    <select v-model="selectedPersonel.yemek_tipi" class="form-input">
+                                                        <option :value="null">— Yok —</option>
+                                                        <option value="kart">🎫 Yemek Kartı</option>
+                                                        <option value="ucret">💰 Yemek Ücreti</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label v-if="selectedPersonel.yemek_tipi === 'kart'">Yemek Kart No</label>
+                                                    <input v-if="selectedPersonel.yemek_tipi === 'kart'" v-model="selectedPersonel.yemek_kart_no" class="form-input" placeholder="1234-5678" />
+                                                    
+                                                    <label v-else-if="selectedPersonel.yemek_tipi === 'ucret'">Yemek Ücreti (₺/gün)</label>
+                                                    <input v-else-if="selectedPersonel.yemek_tipi === 'ucret'" v-model="selectedPersonel.yemek_ucreti" type="number" step="0.01" class="form-input text-right" placeholder="150.00" />
+                                                </div>
+
+                                                <!-- Ulaşım -->
+                                                <div class="form-group">
+                                                    <label>Ulaşım Tipi</label>
+                                                    <select v-model="selectedPersonel.ulasim_tipi" class="form-input">
+                                                        <option :value="null">— Yok —</option>
+                                                        <option value="servis">🚌 Servis</option>
+                                                        <option value="yol_parasi">💵 Yol Parası</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label v-if="selectedPersonel.ulasim_tipi === 'servis'">Servis Plaka</label>
+                                                    <input v-if="selectedPersonel.ulasim_tipi === 'servis'" v-model="selectedPersonel.servis_plaka" class="form-input" placeholder="34 ABC 123" />
+                                                    
+                                                    <label v-else-if="selectedPersonel.ulasim_tipi === 'yol_parasi'">Yol Parası (₺/gün)</label>
+                                                    <input v-else-if="selectedPersonel.ulasim_tipi === 'yol_parasi'" v-model="selectedPersonel.yol_parasi" type="number" step="0.01" class="form-input text-right" placeholder="75.00" />
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div class="form-group">
-                                            <label>Saat 1 <span class="text-[9px] text-gray-400">(günlük/7.5)</span></label>
-                                            <input :value="selectedPersonel.saat_1" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Saat 2 <span class="text-[9px] text-gray-400">(x1.5)</span></label>
-                                            <input :value="selectedPersonel.saat_2" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Saat 3 <span class="text-[9px] text-gray-400">(x2.0)</span></label>
-                                            <input :value="selectedPersonel.saat_3" type="number" step="any" class="form-input text-right bg-gray-50" readonly />
-                                        </div>
-                                        <div class="form-group"><label>Giriş Tarihi</label><input v-model="selectedPersonel.giris_tarihi" type="date" class="form-input" /></div>
-                                        <div class="form-group"><label>Çıkış Tarihi</label><input v-model="selectedPersonel.cikis_tarihi" type="date" class="form-input" /></div>
-                                        <div class="form-group">
-                                            <label>Yemek Tipi</label>
-                                            <select v-model="selectedPersonel.yemek_tipi" class="form-input">
-                                                <option :value="null">— Yok —</option>
-                                                <option value="kart">🎫 Yemek Kartı</option>
-                                                <option value="ucret">💰 Yemek Ücreti</option>
-                                            </select>
-                                        </div>
-                                        <div v-if="selectedPersonel.yemek_tipi === 'kart'" class="form-group"><label>Yemek Kart No</label><input v-model="selectedPersonel.yemek_kart_no" class="form-input" placeholder="1234-5678" /></div>
-                                        <div v-if="selectedPersonel.yemek_tipi === 'ucret'" class="form-group"><label>Yemek Ücreti (₺/gün)</label><input v-model="selectedPersonel.yemek_ucreti" type="number" step="0.01" class="form-input text-right" placeholder="150.00" /></div>
-                                        <div v-if="!selectedPersonel.yemek_tipi" class="form-group"></div>
-                                        <div class="form-group">
-                                            <label>Ulaşım Tipi</label>
-                                            <select v-model="selectedPersonel.ulasim_tipi" class="form-input">
-                                                <option :value="null">— Yok —</option>
-                                                <option value="servis">🚌 Servis</option>
-                                                <option value="yol_parasi">💵 Yol Parası</option>
-                                            </select>
-                                        </div>
-                                        <div v-if="selectedPersonel.ulasim_tipi === 'servis'" class="form-group"><label>Servis Plaka</label><input v-model="selectedPersonel.servis_plaka" class="form-input" placeholder="34 ABC 123" /></div>
-                                        <div v-if="selectedPersonel.ulasim_tipi === 'yol_parasi'" class="form-group"><label>Yol Parası (₺/gün)</label><input v-model="selectedPersonel.yol_parasi" type="number" step="0.01" class="form-input text-right" placeholder="75.00" /></div>
+
                                     </div>
                                 </div>
                             </div>

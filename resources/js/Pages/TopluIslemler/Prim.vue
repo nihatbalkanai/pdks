@@ -21,10 +21,11 @@ const form = reactive({
     bordro_alani: 'PRİM',
 });
 
+const toTitleCase = (str) => { if (!str) return ''; return str.toLocaleLowerCase('tr-TR').replace(/(^|\s)(\S)/g, (m, s, c) => s + c.toLocaleUpperCase('tr-TR')); };
 const filtered = computed(() => {
     if (!search.value) return props.personeller;
-    const q = search.value.toLowerCase();
-    return props.personeller.filter(p => (p.kart_no || '').toLowerCase().includes(q) || (p.ad || '').toLowerCase().includes(q) || (p.soyad || '').toLowerCase().includes(q));
+    const q = search.value.toLocaleLowerCase('tr-TR');
+    return props.personeller.filter(p => (p.kart_no || '').toLowerCase().includes(q) || (p.ad || '').toLocaleLowerCase('tr-TR').includes(q) || (p.soyad || '').toLocaleLowerCase('tr-TR').includes(q));
 });
 
 const toggleAll = () => { selectedIds.value = selectedIds.value.length === filtered.value.length ? [] : filtered.value.map(p => p.id); };
@@ -58,7 +59,7 @@ const submit = () => {
                     <div class="flex-1 overflow-y-auto">
                         <label v-for="p in filtered" :key="p.id" class="flex items-center px-2 py-1 text-xs cursor-pointer border-b border-gray-100 hover:bg-blue-50" :class="{'bg-blue-100': selectedIds.includes(p.id)}">
                             <input type="checkbox" :value="p.id" v-model="selectedIds" class="mr-1.5 rounded-sm border-gray-300 text-blue-600 w-3 h-3" />
-                            <div class="flex-1 min-w-0"><div class="truncate font-medium">{{ p.ad }} {{ p.soyad }}</div><div class="text-[10px] text-gray-500">{{ p.kart_no }} — {{ Number(p.aylik_ucret || 0).toLocaleString('tr-TR') }} ₺</div></div>
+                            <div class="flex-1 min-w-0"><div class="truncate font-medium">{{ toTitleCase(p.ad + ' ' + p.soyad) }}</div><div class="text-[10px] text-gray-500">{{ p.kart_no }} — {{ Number(p.aylik_ucret || 0).toLocaleString('tr-TR') }} ₺</div></div>
                         </label>
                     </div>
                 </div>
