@@ -62,6 +62,7 @@ const form = reactive({
     gun_sayisi: 1,
     aciklama: '',
     durum: 'beklemede',
+    ssk_odeme_tutari: null,
 });
 
 const yeniIzin = () => {
@@ -73,6 +74,7 @@ const yeniIzin = () => {
     form.izin_tipi = 'gunluk';
     form.durum = 'beklemede';
     form.gun_sayisi = 1;
+    form.ssk_odeme_tutari = null;
     modalAcik.value = true;
 };
 
@@ -88,6 +90,7 @@ const duzenle = (izin) => {
     form.gun_sayisi = izin.gun_sayisi;
     form.aciklama = izin.aciklama || '';
     form.durum = izin.durum;
+    form.ssk_odeme_tutari = izin.ssk_odeme_tutari || null;
     modalAcik.value = true;
 };
 
@@ -361,6 +364,11 @@ watch(() => form.izin_turu_id, () => {
                     <div><label class="block text-xs font-bold mb-1">Bitiş Saati</label><input v-model="form.cikis_saati" type="time" class="w-full text-sm rounded border-gray-300"></div>
                 </div>
                 <div><label class="block text-xs font-bold mb-1">Açıklama</label><textarea v-model="form.aciklama" rows="2" class="w-full text-sm rounded border-gray-300" placeholder="Rapor no, izin sebebi vb."></textarea></div>
+                
+                <div v-if="izinTurleri.find(t => t.id === form.izin_turu_id)?.ad.includes('Rapor')" class="bg-blue-50 p-2 rounded border border-blue-200">
+                    <label class="block text-xs font-bold text-blue-700 mb-1">SSK Ödeme Tutarı (Opsiyonel)</label>
+                    <input v-model.number="form.ssk_odeme_tutari" type="number" step="0.01" class="w-full text-sm rounded border-gray-300 border-blue-300 focus:border-blue-500 focus:ring-blue-500" placeholder="SSK tarafından ödenecek/ödenen miktar">
+                </div>
             </div>
             <div class="bg-gray-50 p-3 border-t flex justify-end gap-2">
                 <button @click="modalAcik=false" class="px-3 py-1.5 border bg-white rounded text-sm hover:bg-gray-100">İptal</button>

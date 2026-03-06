@@ -21,6 +21,7 @@ const localPersoneller = ref([...(props.personeller?.data || [])]);
 const searchText = ref('');
 const activeTab = ref('ozluk');
 const activeSubTab = ref('genel');
+const activeIzinTab = ref('ucretli');
 const isLoading = ref(false);
 const isSaving = ref(false);
 
@@ -186,6 +187,7 @@ const savePersonel = async () => {
             gec_kalma_bildirimi: selectedPersonel.value.gec_kalma_bildirimi ?? false,
             dogum_tarihi: selectedPersonel.value.dogum_tarihi || null,
             puantaj_parametre_id: selectedPersonel.value.puantaj_parametre_id || null,
+            aylik_puantaj_parametre_id: selectedPersonel.value.aylik_puantaj_parametre_id || null,
             tc_no: selectedPersonel.value.tc_no || null,
             iban_no: selectedPersonel.value.iban_no || null,
             adres: selectedPersonel.value.adres || null,
@@ -262,7 +264,7 @@ const zimmetEkle = async () => {
     if (!yeniZimmet.value.aciklama) { Swal.fire('Uyarı', 'Açıklama zorunludur.', 'warning'); return; }
     if (!selectedPersonel.value.id) { Swal.fire('Uyarı', 'Önce personel seçiniz.', 'warning'); return; }
     try {
-        await axios.post(route('personel-zimmet.store'), {
+        await axios.post(route('tanim.personel-zimmet.store'), {
             personel_id: selectedPersonel.value.id,
             ...yeniZimmet.value
         });
@@ -282,7 +284,7 @@ const zimmetSil = (z) => {
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
-                await axios.delete(route('personel-zimmet.destroy', z.id));
+                await axios.delete(route('tanim.personel-zimmet.destroy', z.id));
                 await reloadPersonelDetail();
                 Swal.fire({ title: 'Silindi!', text: 'Zimmet silindi.', icon: 'success', timer: 1500 });
             } catch (e) {
@@ -300,7 +302,7 @@ const zimmetIade = (z) => {
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
-                await axios.post(route('personel-zimmet.iade', z.id));
+                await axios.post(route('tanim.personel-zimmet.iade', z.id));
                 await reloadPersonelDetail();
                 Swal.fire({ title: 'İade Edildi!', text: 'Zimmet iade edildi.', icon: 'success', timer: 1500 });
             } catch (e) {
@@ -317,7 +319,7 @@ const mesaiEkle = async () => {
     if (!yeniMesai.value.fazla_mesai_dakika || yeniMesai.value.fazla_mesai_dakika <= 0) { Swal.fire('Uyarı', 'Fazla mesai dakikası giriniz.', 'warning'); return; }
     if (!selectedPersonel.value.id) { Swal.fire('Uyarı', 'Önce personel seçiniz.', 'warning'); return; }
     try {
-        await axios.post(route('mesai.store'), {
+        await axios.post(route('tanim.mesai.store'), {
             personel_id: selectedPersonel.value.id,
             ...yeniMesai.value
         });
@@ -333,7 +335,7 @@ const mesaiGuncelle = async (m, yeniDakika) => {
     const dk = parseInt(yeniDakika);
     if (isNaN(dk) || dk < 0) return;
     try {
-        await axios.put(route('mesai.update', m.id), { fazla_mesai_dakika: dk });
+        await axios.put(route('tanim.mesai.update', m.id), { fazla_mesai_dakika: dk });
         m.fazla_mesai_dakika = dk;
     } catch (e) {
         Swal.fire('Hata', e.response?.data?.message || 'Güncellenemedi.', 'error');
@@ -348,7 +350,7 @@ const mesaiSil = (m) => {
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
-                await axios.delete(route('mesai.destroy', m.id));
+                await axios.delete(route('tanim.mesai.destroy', m.id));
                 await reloadPersonelDetail();
                 Swal.fire({ title: 'Silindi!', text: 'Mesai silindi.', icon: 'success', timer: 1500 });
             } catch (e) {
@@ -404,6 +406,14 @@ const resimInput = ref(null);
 const dosyaInput = ref(null);
 const isUploading = ref(false);
 
+const triggerDosyaSec = () => {
+    if (!selectedPersonel.value.id) {
+        Swal.fire('Uyarı', 'Önce personeli kaydedin.', 'warning');
+        return;
+    }
+    dosyaInput.value?.click();
+};
+
 // Tarih Filtresi
 const now = new Date();
 const filtreBaslangic = ref(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0,10));
@@ -451,6 +461,15 @@ const filtreliMesailer = computed(() => {
 const filtreliIzinler = computed(() => {
     return (selectedPersonel.value.izinler || []).filter(iz => tarihAralikIcinde(iz.tarih));
 });
+const filtreliUcretliIzinler = computed(() => {
+    return filtreliIzinler.value.filter(iz => !iz.izin_turu?.ad?.includes('Rapor') && !iz.izin_turu?.ucret_kesintisi_yapilacak_mi);
+});
+const filtreliUcretsizIzinler = computed(() => {
+    return filtreliIzinler.value.filter(iz => !iz.izin_turu?.ad?.includes('Rapor') && iz.izin_turu?.ucret_kesintisi_yapilacak_mi);
+});
+const filtreliRaporlar = computed(() => {
+    return filtreliIzinler.value.filter(iz => iz.izin_turu?.ad?.includes('Rapor'));
+});
 const filtreliAvanslar = computed(() => {
     return (selectedPersonel.value.avans_kesintiler || []).filter(a => tarihAralikIcinde(a.tarih));
 });
@@ -494,11 +513,15 @@ const dosyaYukle = async (event) => {
     formData.append('personel_id', selectedPersonel.value.id);
     try {
         isUploading.value = true;
-        await axios.post(route('personel-dosya.store'), formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        await axios.post(route('tanim.personel-dosya.store'), formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         await reloadPersonelDetail();
         Swal.fire({ title: 'Başarılı!', text: 'Dosya yüklendi.', icon: 'success', timer: 1500 });
     } catch (e) {
-        Swal.fire('Hata', e.response?.data?.message || 'Dosya yüklenemedi.', 'error');
+        let msg = e.response?.data?.message || 'Dosya yüklenemedi.';
+        if (e.response?.data?.errors) {
+            msg += '\n\n' + Object.values(e.response.data.errors).flat().join('\n');
+        }
+        Swal.fire('Hata', msg, 'error');
     } finally {
         isUploading.value = false;
         if (dosyaInput.value) dosyaInput.value.value = '';
@@ -513,7 +536,7 @@ const dosyaSil = (d) => {
     }).then(async (result) => {
         if (result.isConfirmed) {
             try {
-                await axios.delete(route('personel-dosya.destroy', d.id));
+                await axios.delete(route('tanim.personel-dosya.destroy', d.id));
                 await reloadPersonelDetail();
                 Swal.fire({ title: 'Silindi!', icon: 'success', timer: 1500 });
             } catch (e) { Swal.fire('Hata', 'Silinemedi.', 'error'); }
@@ -722,6 +745,13 @@ const uploadResim = async (event) => {
                                                         <option v-for="p in gunlukPuantajParametreleri" :key="p.id" :value="p.id">{{ p.ad }}</option>
                                                     </select>
                                                 </div>
+                                                <div class="form-group">
+                                                    <label>Aylık Hesap Parametresi</label>
+                                                    <select v-model="selectedPersonel.aylik_puantaj_parametre_id" class="form-input">
+                                                        <option :value="null">Seçiniz</option>
+                                                        <option v-for="p in aylikPuantajParametreleri" :key="p.id" :value="p.id">{{ p.hesap_parametresi_adi }}</option>
+                                                    </select>
+                                                </div>
                                                 <div class="form-group"><label>E-Posta</label><input v-model="selectedPersonel.email" type="email" class="form-input" placeholder="ornek@mail.com" /></div>
                                                 <div class="form-group"><label>Telefon</label><input v-model="selectedPersonel.telefon" class="form-input" placeholder="05XX XXX XX XX" /></div>
                                                 <div class="form-group"><label>Doğum Tarihi</label><input v-model="selectedPersonel.dogum_tarihi" type="date" class="form-input" /></div>
@@ -836,12 +866,19 @@ const uploadResim = async (event) => {
                                     </div>
                                     <div class="mt-1 text-[10px] text-gray-400 text-center">İş Kanunu m.53 — 1-5 yıl: 14 gün, 5-15 yıl: 20 gün, 15+ yıl: 26 gün</div>
                                 </div>
-                                <table class="data-table">
+
+                                <div class="flex mb-2 px-3 gap-2">
+                                    <button @click="activeIzinTab = 'ucretli'" class="px-3 py-1 text-xs border rounded transition shadow-sm" :class="activeIzinTab === 'ucretli' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Ücretli İzinler</button>
+                                    <button @click="activeIzinTab = 'ucretsiz'" class="px-3 py-1 text-xs border rounded transition shadow-sm" :class="activeIzinTab === 'ucretsiz' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">Ücretsiz İzinler</button>
+                                    <button @click="activeIzinTab = 'rapor'" class="px-3 py-1 text-xs border rounded transition shadow-sm" :class="activeIzinTab === 'rapor' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-100'">SSK Rapor Ödemeleri</button>
+                                </div>
+
+                                <table class="data-table mt-3">
                                     <thead><tr>
-                                        <th>İzin Türü</th><th>Başlangıç</th><th>Bitiş</th><th>Gün</th><th>Tip</th><th>Durum</th><th>Açıklama</th>
+                                        <th>İzin Türü</th><th>Başlangıç</th><th>Bitiş</th><th>Gün</th><th>Tip</th><th>Durum</th><th>Açıklama</th><th v-if="activeIzinTab === 'rapor'">SSK Ödeme Tutarı</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="iz in filtreliIzinler" :key="iz.id">
+                                        <tr v-for="iz in (activeIzinTab === 'ucretli' ? filtreliUcretliIzinler : (activeIzinTab === 'ucretsiz' ? filtreliUcretsizIzinler : filtreliRaporlar))" :key="iz.id">
                                             <td class="font-medium">{{ iz.izin_turu?.ad || '-' }}</td>
                                             <td>{{ formatTarih(iz.tarih) }}</td>
                                             <td>{{ iz.bitis_tarihi ? formatTarih(iz.bitis_tarihi) : '-' }}</td>
@@ -857,8 +894,11 @@ const uploadResim = async (event) => {
                                                 </span>
                                             </td>
                                             <td>{{ iz.aciklama || '-' }}</td>
+                                            <td v-if="activeIzinTab === 'rapor'" class="font-bold text-green-700 text-right">{{ iz.ssk_odeme_tutari ? formatTutar(iz.ssk_odeme_tutari) : '-' }}</td>
                                         </tr>
-                                        <tr v-if="!filtreliIzinler.length"><td colspan="7" class="text-center text-gray-400 py-6">İzin kaydı yok</td></tr>
+                                        <tr v-if="(activeIzinTab === 'ucretli' && !filtreliUcretliIzinler.length) || (activeIzinTab === 'ucretsiz' && !filtreliUcretsizIzinler.length) || (activeIzinTab === 'rapor' && !filtreliRaporlar.length)">
+                                            <td :colspan="activeIzinTab === 'rapor' ? 8 : 7" class="text-center text-gray-400 py-6">Kayıt bulunamadı</td>
+                                        </tr>
                                     </tbody>
                                 </table>
                             </div>
@@ -1029,7 +1069,7 @@ const uploadResim = async (event) => {
                             <div v-else-if="activeTab === 'dosya'">
                                 <div class="mb-3 flex items-center gap-3">
                                     <input type="file" ref="dosyaInput" @change="dosyaYukle" style="display:none" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx" />
-                                    <button @click="$refs.dosyaInput.click()" class="bg-blue-600 text-white text-xs px-4 py-1.5 rounded hover:bg-blue-700 transition" :disabled="isUploading || !selectedPersonel.id">
+                                    <button @click="triggerDosyaSec" class="bg-blue-600 text-white text-xs px-4 py-1.5 rounded hover:bg-blue-700 transition" :disabled="isUploading || !selectedPersonel.id">
                                         {{ isUploading ? 'Yükleniyor...' : '📁 Dosya Yükle' }}
                                     </button>
                                     <span class="text-[10px] text-gray-400">PDF, JPG, PNG, DOC, DOCX, XLS, XLSX — Max 10MB</span>

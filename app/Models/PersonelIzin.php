@@ -27,7 +27,11 @@ class PersonelIzin extends Model
         'uuid', 'firma_id', 'personel_id', 'izin_turu_id',
         'tarih', 'bitis_tarihi', 'gun_sayisi',
         'tatil_tipi', 'giris_saati', 'cikis_saati', 'izin_tipi',
-        'aciklama', 'durum', 'onaylayan_id', 'belge_yolu',
+        'aciklama',
+        'durum',
+        'onaylayan_id',
+        'belge_yolu',
+        'ssk_odeme_tutari',
     ];
 
     protected $casts = [

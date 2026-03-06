@@ -24,7 +24,11 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
 
     // Personel İşlemleri
     Route::resource('personeller', \App\Http\Controllers\PersonelController::class)->parameters(['personeller' => 'personel'])->middleware('rol.yetki:personel_islemleri');
-    Route::post('/personeller/{id}/resim', [\App\Http\Controllers\PersonelController::class, 'resimYukle'])->name('personeller.resim-yukle')->middleware('rol.yetki:personel_kartlari');
+    Route::post('/personeller/{id}/resim', [\App\Http\Controllers\PersonelController::class, 'resimYukle'])->name('personeller.resim-yukle')->middleware('rol.yetki:personel_islemleri');
+
+    // Hesap Raporları
+    Route::get('/hesap-raporlari/puantaj-hesaplama', [\App\Http\Controllers\PuantajHesaplamaController::class, 'index'])->name('hesap-raporlari.puantaj-hesaplama');
+    Route::post('/hesap-raporlari/puantaj-hesapla', [\App\Http\Controllers\PuantajHesaplamaController::class, 'hesapla'])->name('hesap-raporlari.puantaj-hesapla');
 
     // Cihaz İşlemleri
     Route::resource('cihazlar', \App\Http\Controllers\PdksCihaziController::class)->middleware('rol.yetki:cihaz_islemleri');

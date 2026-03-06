@@ -29,7 +29,7 @@ class PersonelController extends Controller
                 });
             })
             ->orderBy('created_at', 'desc')
-            ->paginate(15)
+            ->paginate(50)
             ->withQueryString(); // Filtrelerin sayfalama sırasında kaybolmaması için
 
         $firma_id = Auth::user()->firma_id ?? 1;
@@ -91,6 +91,7 @@ class PersonelController extends Controller
             'gec_kalma_bildirimi' => 'boolean',
             'dogum_tarihi' => 'nullable|date',
             'puantaj_parametre_id' => 'nullable|exists:gunluk_puantaj_parametreleri,id',
+            'aylik_puantaj_parametre_id' => 'nullable|exists:aylik_puantaj_parametreleri,id',
         ]);
 
         if (empty($validated['ad_soyad'])) {
@@ -272,6 +273,7 @@ class PersonelController extends Controller
             'gec_kalma_bildirimi' => 'boolean',
             'dogum_tarihi' => 'nullable|date',
             'puantaj_parametre_id' => 'nullable|exists:gunluk_puantaj_parametreleri,id',
+            'aylik_puantaj_parametre_id' => 'nullable|exists:aylik_puantaj_parametreleri,id',
             'tc_no' => 'nullable|string|size:11',
             'iban_no' => 'nullable|string|max:34',
             'adres' => 'nullable|string',
@@ -306,13 +308,13 @@ class PersonelController extends Controller
 
         // Eski resmi sil
         if ($personel->resim_yolu && file_exists(public_path($personel->resim_yolu))) {
-            unlink(public_path($personel->resim_yolu));
+            @unlink(public_path($personel->resim_yolu));
         }
 
         $dosyaAdi = 'personel_' . $id . '_' . time() . '.' . $request->resim->extension();
-        $request->resim->move(public_path('uploads/personel'), $dosyaAdi);
+        $path = $request->file('resim')->storeAs('personel', $dosyaAdi, 'public');
 
-        $personel->resim_yolu = 'uploads/personel/' . $dosyaAdi;
+        $personel->resim_yolu = 'storage/' . $path;
         $personel->save();
 
         return response()->json(['success' => true, 'resim_yolu' => $personel->resim_yolu]);

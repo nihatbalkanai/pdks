@@ -17,7 +17,7 @@ const loadSections = () => {
         const saved = localStorage.getItem('pdks_sidebar_sections');
         if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return { personel: true, toplu: false, tanim: false, hesap_param: false };
+    return { personel: true, toplu: false, tanim: false, hesap_param: false, rapor_ozluk: true, rapor_hesap: true };
 };
 
 const sections = ref(loadSections());
@@ -355,33 +355,55 @@ onUnmounted(() => {
                     </div>
                 </div>
                 
-                <div class="px-1 py-1">
-                    <div class="px-2 py-1.5 text-xs font-semibold text-red-600 flex items-center">
-                        <svg class="w-3.5 h-3.5 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
-                        Özlük Rapor
+                <div class="border-b border-gray-300">
+                    <button @click="toggleSection('rapor_ozluk')" class="sidebar-section-header">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-1.5 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
+                            <span class="font-semibold text-xs">Özlük Rapor</span>
+                        </div>
+                        <svg :class="{'rotate-180': !sections.rapor_ozluk}" class="w-3.5 h-3.5 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div v-show="sections.rapor_ozluk" class="px-1 py-1">
+                        <a :href="route('raporlar.r01')" class="report-item">01. Genel Bazda Giriş Çıkış Listesi</a>
+                        <a :href="route('raporlar.r02')" class="report-item">02. Kişi Bazında Giriş Çıkış Listesi</a>
+                        <a :href="route('raporlar.r03')" class="report-item">03. Genel Bazda Geç Kalanlar Listesi</a>
+                        <a :href="route('raporlar.r04')" class="report-item">04. Kişi Bazında Geç Kalanlar Listesi</a>
+                        <a :href="route('raporlar.r05')" class="report-item">05. Genel Bazda Erken Çıkanlar Listesi</a>
+                        <a :href="route('raporlar.r06')" class="report-item">06. Kişi Bazında Erken Çıkanlar Listesi</a>
+                        <a :href="route('raporlar.r07')" class="report-item">07. Mesaiye Kalanlar Listesi</a>
+                        <a :href="route('raporlar.r08')" class="report-item">08. Devamsızlar Listesi</a>
+                        <a :href="route('raporlar.r09')" class="report-item">09. Girişte Kart Kullanmayı Unutanlar</a>
+                        <a :href="route('raporlar.r10')" class="report-item">10. Çıkışta Kart Kullanmayı Unutanlar</a>
+                        <a :href="route('raporlar.r11')" class="report-item">11. Giriş yada Çıkışta Unutanlar</a>
+                        <a :href="route('raporlar.r12')" class="report-item">12. Şuan İçerideki Personeller</a>
+                        <a :href="route('raporlar.r13')" class="report-item">13. Elle Müdahale Yapılmış Hareketler</a>
+                        <a :href="route('raporlar.r14')" class="report-item">14. Personellerin Not Bilgileri</a>
+                        <a :href="route('raporlar.r15')" class="report-item">15. Personellerin İrtibat Bilgileri</a>
+                        <a :href="route('raporlar.r16')" class="report-item">16. İşe Giren Personeller</a>
+                        <a :href="route('raporlar.r17')" class="report-item">17. İşten Ayrılan Personeller</a>
+                        <a :href="route('raporlar.r18')" class="report-item">18. Tatil Günü Çalışanlar</a>
+                        <a :href="route('raporlar.r19')" class="report-item">19. İzin Kullananlar</a>
+                        <a :href="route('raporlar.r20')" class="report-item">20. Avans Listesi</a>
+                        <a :href="route('raporlar.r21')" class="report-item">21. Prim Listesi</a>
+                        <a :href="route('raporlar.r22')" class="report-item">22. Aylık Devam Listesi</a>
                     </div>
-                    <a :href="route('raporlar.r01')" class="report-item">01. Genel Bazda Giriş Çıkış Listesi</a>
-                    <a :href="route('raporlar.r02')" class="report-item">02. Kişi Bazında Giriş Çıkış Listesi</a>
-                    <a :href="route('raporlar.r03')" class="report-item">03. Genel Bazda Geç Kalanlar Listesi</a>
-                    <a :href="route('raporlar.r04')" class="report-item">04. Kişi Bazında Geç Kalanlar Listesi</a>
-                    <a :href="route('raporlar.r05')" class="report-item">05. Genel Bazda Erken Çıkanlar Listesi</a>
-                    <a :href="route('raporlar.r06')" class="report-item">06. Kişi Bazında Erken Çıkanlar Listesi</a>
-                    <a :href="route('raporlar.r07')" class="report-item">07. Mesaiye Kalanlar Listesi</a>
-                    <a :href="route('raporlar.r08')" class="report-item">08. Devamsızlar Listesi</a>
-                    <a :href="route('raporlar.r09')" class="report-item">09. Girişte Kart Kullanmayı Unutanlar</a>
-                    <a :href="route('raporlar.r10')" class="report-item">10. Çıkışta Kart Kullanmayı Unutanlar</a>
-                    <a :href="route('raporlar.r11')" class="report-item">11. Giriş yada Çıkışta Unutanlar</a>
-                    <a :href="route('raporlar.r12')" class="report-item">12. Şuan İçerideki Personeller</a>
-                    <a :href="route('raporlar.r13')" class="report-item">13. Elle Müdahale Yapılmış Hareketler</a>
-                    <a :href="route('raporlar.r14')" class="report-item">14. Personellerin Not Bilgileri</a>
-                    <a :href="route('raporlar.r15')" class="report-item">15. Personellerin İrtibat Bilgileri</a>
-                    <a :href="route('raporlar.r16')" class="report-item">16. İşe Giren Personeller</a>
-                    <a :href="route('raporlar.r17')" class="report-item">17. İşten Ayrılan Personeller</a>
-                    <a :href="route('raporlar.r18')" class="report-item">18. Tatil Günü Çalışanlar</a>
-                    <a :href="route('raporlar.r19')" class="report-item">19. İzin Kullananlar</a>
-                    <a :href="route('raporlar.r20')" class="report-item">20. Avans Listesi</a>
-                    <a :href="route('raporlar.r21')" class="report-item">21. Prim Listesi</a>
-                    <a :href="route('raporlar.r22')" class="report-item">22. Aylık Devam Listesi</a>
+                </div>
+
+                <div class="border-b border-gray-300">
+                    <button @click="toggleSection('rapor_hesap')" class="sidebar-section-header">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-1.5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm1 8a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
+                            <span class="font-semibold text-xs">Hesap Raporları</span>
+                        </div>
+                        <svg :class="{'rotate-180': !sections.rapor_hesap}" class="w-3.5 h-3.5 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div v-show="sections.rapor_hesap" class="px-1 py-1">
+                        <a :href="route('hesap-raporlari.puantaj-hesaplama')" class="report-item report-item-hesap">Puantaj Hesaplama</a>
+                        <a href="#" class="report-item report-item-hesap">02. Genel Bazda Maaş Ekstresi</a>
+                        <a href="#" class="report-item report-item-hesap">03. Kişi Bazında Maaş Ekstresi</a>
+                        <a href="#" class="report-item report-item-hesap">04. Maaş Pusulası</a>
+                        <a href="#" class="report-item report-item-hesap">05. Grup Bazlı Maaş Ekstresi</a>
+                    </div>
                 </div>
             </aside>
         </div>
@@ -417,5 +439,8 @@ onUnmounted(() => {
 .report-item::before {
     content: '';
     @apply w-3 h-3 mr-1.5 bg-blue-100 rounded-sm border border-blue-300 flex-shrink-0 inline-block;
+}
+.report-item-hesap::before {
+    @apply bg-indigo-100 border-indigo-300;
 }
 </style>

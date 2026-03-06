@@ -14,26 +14,43 @@ class PersonelDosyaController extends Controller
      */
     public function store(Request $request)
     {
-        $request->validate([
-            'personel_id' => 'required|integer',
-            'dosya'       => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx',
-        ]);
+        try {
+            $request->validate([
+                'personel_id' => 'required|integer',
+                'dosya'       => 'required|file|max:10240|mimes:pdf,jpg,jpeg,png,doc,docx,xls,xlsx',
+            ]);
 
-        $firma_id = Auth::user()->firma_id ?? 1;
-        $file = $request->file('dosya');
+            $firma_id = Auth::user()->firma_id ?? 1;
+            $file = $request->file('dosya');
 
-        $path = $file->store("personel-dosyalar/{$request->personel_id}", 'public');
+            $path = $file->store("personel-dosyalar/{$request->personel_id}", 'public');
 
-        $dosya = PersonelDosya::create([
-            'firma_id'    => $firma_id,
-            'personel_id' => $request->personel_id,
-            'dosya_adi'   => $file->getClientOriginalName(),
-            'dosya_yolu'  => $path,
-            'dosya_tipi'  => $file->getClientOriginalExtension(),
-            'boyut'       => $file->getSize(),
-        ]);
+            $dosya = PersonelDosya::create([
+                'uuid'        => (string) \Illuminate\Support\Str::uuid(),
+                'firma_id'    => $firma_id,
+                'personel_id' => $request->personel_id,
+                'dosya_adi'   => $file->getClientOriginalName(),
+                'dosya_yolu'  => $path,
+                'dosya_tipi'  => $file->getClientOriginalExtension(),
+                'boyut'       => $file->getSize(),
+            ]);
 
-        return response()->json(['success' => true, 'dosya' => $dosya, 'message' => 'Dosya yüklendi.']);
+            return response()->json(['success' => true, 'dosya' => $dosya, 'message' => 'Dosya yüklendi.']);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Geçersiz dosya formatı veya boyutu.',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            if (isset($path)) {
+                Storage::disk('public')->delete($path); // Temizle
+            }
+            return response()->json([
+                'success' => false,
+                'message' => 'Sunucu hatası: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /**

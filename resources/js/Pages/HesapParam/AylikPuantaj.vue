@@ -1,7 +1,7 @@
 <script setup>
 import { ref, reactive } from 'vue';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import Swal from 'sweetalert2';
 
@@ -12,6 +12,7 @@ const props = defineProps({
 const isModalOpen = ref(false);
 const isEditing = ref(false);
 const currentId = ref(null);
+const formErrors = ref({});
 
 const form = reactive({
     hesap_parametresi_adi: '',
@@ -24,6 +25,19 @@ const form = reactive({
     resmi_tatil_mesai_carpani: 2.0,
     durum: true,
 });
+
+const resetForm = () => {
+    form.hesap_parametresi_adi = '';
+    form.aylik_calisma_saati = 225;
+    form.haftalik_calisma_saati = 45;
+    form.gunluk_calisma_saati = 7.5;
+    form.eksik_gun_kesintisi_yapilacak_mi = true;
+    form.fazla_mesai_carpani = 1.5;
+    form.tatil_mesai_carpani = 2.0;
+    form.resmi_tatil_mesai_carpani = 2.0;
+    form.durum = true;
+    formErrors.value = {};
+};
 
 const openModal = (parametre = null) => {
     if (parametre) {
@@ -41,29 +55,32 @@ const openModal = (parametre = null) => {
     } else {
         isEditing.value = false;
         currentId.value = null;
-        // form reset (reactive)
-        form.durum = true;
-        form.eksik_gun_kesintisi_yapilacak_mi = true;
+        resetForm();
     }
     isModalOpen.value = true;
 };
 
 const closeModal = () => {
     isModalOpen.value = false;
-    // form reset (reactive)
-    form.clearErrors();
+    formErrors.value = {};
 };
 
-const saveParametre = () => {
-    if (isEditing.value) {
-        form.put(route('tanim.puantaj-parametreleri.update', currentId.value), {
-            onSuccess: () => {
-                closeModal();
-                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Güncellendi', showConfirmButton: false, timer: 1500 });
-            },
-        });
-    } else {
-        axios.post(route('tanim.puantaj-parametreleri.store'), { ...form }).then(() => { closeModal(); Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Eklendi', showConfirmButton: false, timer: 1500 }); }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
+const saveParametre = async () => {
+    try {
+        if (isEditing.value) {
+            await axios.put(route('tanim.puantaj-parametreleri.update', currentId.value), { ...form });
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Güncellendi', showConfirmButton: false, timer: 1500 });
+        } else {
+            await axios.post(route('tanim.puantaj-parametreleri.store'), { ...form });
+            Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Eklendi', showConfirmButton: false, timer: 1500 });
+        }
+        closeModal();
+        router.reload();
+    } catch (e) {
+        if (e.response?.status === 422) {
+            formErrors.value = e.response.data.errors || {};
+        }
+        Swal.fire('Hata', e.response?.data?.message || 'İşlem sırasında hata oluştu.', 'error');
     }
 };
 
@@ -77,13 +94,15 @@ const deleteParametre = (id) => {
         cancelButtonColor: '#3085d6',
         confirmButtonText: 'Evet, Sil',
         cancelButtonText: 'İptal'
-    }).then((result) => {
+    }).then(async (result) => {
         if (result.isConfirmed) {
-            form.delete(route('tanim.puantaj-parametreleri.destroy', id), {
-                onSuccess: () => {
-                    Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Silindi', showConfirmButton: false, timer: 1500 });
-                }
-            });
+            try {
+                await axios.delete(route('tanim.puantaj-parametreleri.destroy', id));
+                Swal.fire({ toast: true, position: 'top-end', icon: 'success', title: 'Silindi', showConfirmButton: false, timer: 1500 });
+                router.reload();
+            } catch (e) {
+                Swal.fire('Hata', e.response?.data?.message || 'Silme işleminde hata oluştu.', 'error');
+            }
         }
     });
 };
@@ -180,7 +199,7 @@ const deleteParametre = (id) => {
                     <div>
                         <label class="block text-xs font-semibold text-gray-700 mb-1">Hesap Parametresi Adı <span class="text-red-500">*</span></label>
                         <input v-model="form.hesap_parametresi_adi" type="text" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" required placeholder="Örn: GENEL AYLIK PAR.">
-                        <div v-if="form.errors.hesap_parametresi_adi" class="text-red-500 text-xs mt-1">{{ form.errors.hesap_parametresi_adi }}</div>
+                        <div v-if="formErrors.hesap_parametresi_adi" class="text-red-500 text-xs mt-1">{{ formErrors.hesap_parametresi_adi[0] }}</div>
                         <p class="text-[10px] text-gray-500 mt-1">Bu ad, "Genel Gruplar Çalışma Planı" veya Personel Kartı'ndaki grup/parametre adlarıyla eşleşmelidir.</p>
                     </div>
 
@@ -191,7 +210,7 @@ const deleteParametre = (id) => {
                                 <input v-model="form.aylik_calisma_saati" type="number" step="1" class="w-full text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm pr-10" required>
                                 <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-xs text-gray-400">Saat</div>
                             </div>
-                            <div v-if="form.errors.aylik_calisma_saati" class="text-red-500 text-xs mt-1">{{ form.errors.aylik_calisma_saati }}</div>
+                            <div v-if="formErrors.aylik_calisma_saati" class="text-red-500 text-xs mt-1">{{ formErrors.aylik_calisma_saati[0] }}</div>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-gray-700 mb-1">Haftalık Çalışma</label>

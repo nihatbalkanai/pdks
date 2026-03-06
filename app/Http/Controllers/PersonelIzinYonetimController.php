@@ -141,6 +141,7 @@ class PersonelIzinYonetimController extends Controller
             'gun_sayisi' => 'nullable|numeric|min:0.5',
             'aciklama' => 'nullable|string|max:500',
             'durum' => 'nullable|string',
+            'ssk_odeme_tutari' => 'nullable|numeric|min:0',
         ]);
 
         $firma_id = Auth::user()->firma_id ?? 1;
@@ -213,6 +214,7 @@ class PersonelIzinYonetimController extends Controller
             'gun_sayisi' => $gunSayisi,
             'aciklama' => $validated['aciklama'] ?? null,
             'durum' => $validated['durum'] ?? 'beklemede',
+            'ssk_odeme_tutari' => $validated['ssk_odeme_tutari'] ?? null,
             'onaylayan_id' => ($validated['durum'] ?? '') === 'onaylandi' ? Auth::id() : null,
         ]);
 
@@ -239,6 +241,7 @@ class PersonelIzinYonetimController extends Controller
             'gun_sayisi' => 'nullable|numeric|min:0.5',
             'aciklama' => 'nullable|string|max:500',
             'durum' => 'nullable|string',
+            'ssk_odeme_tutari' => 'nullable|numeric|min:0',
         ]);
 
         $firma_id = Auth::user()->firma_id ?? 1;

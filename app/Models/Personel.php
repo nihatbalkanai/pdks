@@ -29,6 +29,7 @@ class Personel extends Model
         'sube_id',
         'servis_id',
         'puantaj_parametre_id',
+        'aylik_puantaj_parametre_id',
         'kart_no',
         'ad_soyad', // Still keeping ad_soyad for backward compatibility
         'ad',
@@ -118,5 +119,10 @@ class Personel extends Model
     public function puantajParametresi()
     {
         return $this->belongsTo(GunlukPuantajParametresi::class, 'puantaj_parametre_id');
+    }
+
+    public function aylikPuantajParametresi()
+    {
+        return $this->belongsTo(AylikPuantajParametresi::class, 'aylik_puantaj_parametre_id');
     }
 }
