@@ -70,6 +70,7 @@ class Personel extends Model
         'ulasim_tipi',
         'servis_plaka',
         'yol_parasi',
+        'mobil_sifre',
     ];
 
     public function izinler()

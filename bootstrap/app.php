@@ -29,6 +29,32 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $e, \Illuminate\Http\Request $request) {
             if ($request->is('api/*')) {
+                // Authentication hatası → 401
+                if ($e instanceof \Illuminate\Auth\AuthenticationException) {
+                    return response()->json([
+                        'hata' => true,
+                        'mesaj' => 'Oturum süresi dolmuş veya geçersiz token. Lütfen tekrar giriş yapın.',
+                    ], 401);
+                }
+
+                // Validation hatası → 422
+                if ($e instanceof \Illuminate\Validation\ValidationException) {
+                    return response()->json([
+                        'hata' => true,
+                        'mesaj' => 'Doğrulama hatası.',
+                        'hatalar' => $e->errors(),
+                    ], 422);
+                }
+
+                // Model bulunamadı → 404
+                if ($e instanceof \Illuminate\Database\Eloquent\ModelNotFoundException) {
+                    return response()->json([
+                        'hata' => true,
+                        'mesaj' => 'Kayıt bulunamadı.',
+                    ], 404);
+                }
+
+                // Diğer hatalar → 500
                 return response()->json([
                     'hata' => true,
                     'mesaj' => 'Sunucu ile iletişimde bir sorun oluştu, lütfen teknik ekibe bildiriniz.',

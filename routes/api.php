@@ -10,10 +10,18 @@ Route::get('/user', function (Request $request) {
 // PDKS Cihaz veri aktarım servisi (Cihaz Token - Sanctum korumalı)
 Route::middleware('auth:sanctum')->post('/pdks/veri', [\App\Http\Controllers\Api\PdksVeriController::class, 'store']);
 
-// Personel Mobil Uygulama API Rotaları
-Route::post('/mobil-login', [\App\Http\Controllers\Api\MobilAppController::class, 'login']);
+// ═══════════════════ MOBİL UYGULAMA API ═══════════════════
 
-Route::middleware('auth:sanctum')->group(function () {
+// Açık endpoint'ler (token gerektirmez)
+Route::prefix('mobil')->group(function () {
+    Route::post('/giris', [\App\Http\Controllers\Api\MobilAppController::class, 'login']);
+});
+
+// Korumalı endpoint'ler (Sanctum token gerektirir)
+Route::prefix('mobil')->middleware('auth:sanctum')->group(function () {
+    Route::post('/hareket', [\App\Http\Controllers\Api\MobilAppController::class, 'girisYap']);
+    Route::get('/bugun', [\App\Http\Controllers\Api\MobilAppController::class, 'bugunDurum']);
+    Route::get('/gecmis', [\App\Http\Controllers\Api\MobilAppController::class, 'gecmis']);
     Route::get('/profil', [\App\Http\Controllers\Api\MobilAppController::class, 'profil']);
-    Route::get('/hareketlerim', [\App\Http\Controllers\Api\MobilAppController::class, 'hareketlerim']);
+    Route::post('/sifre-degistir', [\App\Http\Controllers\Api\MobilAppController::class, 'sifreDegistir']);
 });

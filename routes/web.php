@@ -5,14 +5,13 @@ use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
-Route::get('/', function () {
-    return Inertia::render('Welcome', [
-        'canLogin' => Route::has('login'),
-        'canRegister' => Route::has('register'),
-        'laravelVersion' => Application::VERSION,
-        'phpVersion' => PHP_VERSION,
-    ]);
-});
+// Public Web Sayfaları
+Route::get('/', [\App\Http\Controllers\WebController::class, 'anasayfa'])->name('web.anasayfa');
+Route::get('/hakkimizda', [\App\Http\Controllers\WebController::class, 'hakkimizda'])->name('web.hakkimizda');
+Route::get('/fiyatlar', [\App\Http\Controllers\WebController::class, 'fiyatlar'])->name('web.fiyatlar');
+Route::get('/referanslar', [\App\Http\Controllers\WebController::class, 'referanslar'])->name('web.referanslar');
+Route::get('/haberler', [\App\Http\Controllers\WebController::class, 'haberler'])->name('web.haberler');
+Route::get('/iletisim', [\App\Http\Controllers\WebController::class, 'iletisim'])->name('web.iletisim');
 
 Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified', 'abonelik'])->name('dashboard');
@@ -42,6 +41,29 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     // Şube & Servis
     Route::resource('subeler', \App\Http\Controllers\SubeController::class)->middleware([\App\Http\Middleware\FeatureGate::class.':şube_yönetimi', 'rol.yetki:subeler']);
     Route::resource('servisler', \App\Http\Controllers\ServisController::class)->middleware([\App\Http\Middleware\FeatureGate::class.':servis_takibi', 'rol.yetki:servisler']);
+
+    // İK Yönetimi
+    Route::prefix('ik')->name('ik.')->group(function () {
+        Route::get('/izin-talepleri', [\App\Http\Controllers\IkYonetimController::class, 'izinTalepleri'])->name('izin-talepleri');
+        Route::post('/izin-talepleri', [\App\Http\Controllers\IkYonetimController::class, 'izinTalebiOlustur'])->name('izin-talepleri.olustur');
+        Route::put('/izin-talepleri/{id}', [\App\Http\Controllers\IkYonetimController::class, 'izinTalebiIslem'])->name('izin-talepleri.islem');
+        Route::get('/performans', [\App\Http\Controllers\IkYonetimController::class, 'performans'])->name('performans');
+        Route::post('/performans', [\App\Http\Controllers\IkYonetimController::class, 'performansKaydet'])->name('performans.kaydet');
+        Route::get('/egitimler', [\App\Http\Controllers\IkYonetimController::class, 'egitimler'])->name('egitimler');
+        Route::post('/egitimler', [\App\Http\Controllers\IkYonetimController::class, 'egitimKaydet'])->name('egitimler.kaydet');
+        Route::get('/disiplin', [\App\Http\Controllers\IkYonetimController::class, 'disiplin'])->name('disiplin');
+        Route::post('/disiplin', [\App\Http\Controllers\IkYonetimController::class, 'disiplinKaydet'])->name('disiplin.kaydet');
+        Route::get('/kidem-hesaplayici', [\App\Http\Controllers\IkYonetimController::class, 'kidemHesaplayici'])->name('kidem-hesaplayici');
+    });
+
+    // Mobil Bağlantı Yönetimi
+    Route::prefix('baglanti')->name('baglanti.')->group(function () {
+        Route::get('/mobil', [\App\Http\Controllers\MobilBaglantiController::class, 'index'])->name('mobil');
+        Route::post('/mobil/ayarlar', [\App\Http\Controllers\MobilBaglantiController::class, 'ayarlarKaydet'])->name('mobil.ayarlar');
+        Route::put('/mobil/cihaz/{id}', [\App\Http\Controllers\MobilBaglantiController::class, 'cihazDurumDegistir'])->name('mobil.cihaz.durum');
+        Route::delete('/mobil/cihaz/{id}', [\App\Http\Controllers\MobilBaglantiController::class, 'cihazSil'])->name('mobil.cihaz.sil');
+        Route::post('/mobil/qr-kod', [\App\Http\Controllers\MobilBaglantiController::class, 'qrKodOlustur'])->name('mobil.qr-kod');
+    });
 
     // Genel Raporlar (Özlük / Devam)
     Route::get('/raporlar', [\App\Http\Controllers\RaporController::class, 'index'])->name('raporlar.index')->middleware('rol.yetki:genel_raporlar');

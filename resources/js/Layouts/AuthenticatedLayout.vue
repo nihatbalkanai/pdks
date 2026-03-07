@@ -29,7 +29,7 @@ const loadSections = () => {
         const saved = localStorage.getItem('pdks_sidebar_sections');
         if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return { personel: true, toplu: false, tanim: false, hesap_param: false, rapor_ozluk: true, rapor_hesap: true };
+    return { ik: false, personel: true, toplu: false, baglanti: false, tanim: false, hesap_param: false, rapor_ozluk: true, rapor_hesap: true };
 };
 
 const sections = ref(loadSections());
@@ -271,6 +271,43 @@ onUnmounted(() => {
             <!-- SOL PANEL (Personel İşlemleri, Toplu İşlemler, Tanım İşlemleri) -->
             <aside class="w-52 bg-white border-r border-gray-400 flex flex-col overflow-y-auto shadow-inner">
                 
+                <!-- İK Yönetimi -->
+                <div class="border-b border-gray-300">
+                    <button @click="toggleSection('ik')" class="sidebar-section-header">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-1.5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                            <span class="font-semibold text-xs">İK Yönetimi</span>
+                        </div>
+                        <svg :class="{'rotate-180': !sections.ik}" class="w-3.5 h-3.5 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div v-show="sections.ik" class="bg-white">
+                        <Link :href="route('ik.izin-talepleri')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/ik/izin-talepleri')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-teal-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 011 1v3a1 1 0 11-2 0V8a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                            İzin Talepleri
+                        </Link>
+                        <Link :href="route('ik.performans')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/ik/performans')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zm6-4a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zm6-3a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"></path></svg>
+                            Performans
+                        </Link>
+                        <Link :href="route('ik.egitimler')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/ik/egitimler')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3z"></path><path d="M3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0z"></path></svg>
+                            Eğitim Takibi
+                        </Link>
+                        <Link :href="route('ik.disiplin')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/ik/disiplin')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd"></path></svg>
+                            Disiplin Kayıtları
+                        </Link>
+                        <Link :href="route('ik.kidem-hesaplayici')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/ik/kidem')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-indigo-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 2a1 1 0 000 2h6a1 1 0 100-2H7zm6 7a1 1 0 011 1v3a1 1 0 11-2 0v-3a1 1 0 011-1zm-3-1a1 1 0 10-2 0v4a1 1 0 102 0v-4zm-4 3a1 1 0 012 0v1a1 1 0 11-2 0v-1z" clip-rule="evenodd"></path></svg>
+                            Kıdem Hesaplayıcı
+                        </Link>
+                        <Link :href="route('personeller.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('personeller.*')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"></path></svg>
+                            Özlük Dosyaları
+                        </Link>
+                    </div>
+                </div>
+
                 <!-- Personel İşlemleri -->
                 <div class="border-b border-gray-300">
                     <button @click="toggleSection('personel')" class="sidebar-section-header">
@@ -292,10 +329,6 @@ onUnmounted(() => {
                         <Link v-if="y('avans_kesintiler')" :href="route('avans-kesintiler.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('avans-kesintiler.*')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-red-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 000 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
                             Kesintiler
-                        </Link>
-                        <Link v-if="y('cihaz_transfer')" :href="route('cihaz-transfer.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('cihaz-transfer.*')}">
-                            <svg class="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"></path></svg>
-                            Cihazdan Veri Transferi
                         </Link>
                     </div>
                 </div>
@@ -354,6 +387,32 @@ onUnmounted(() => {
                             <svg class="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"></path></svg>
                             Zamanlanmış Bildirimler
                         </Link>
+                    </div>
+                </div>
+
+                <!-- Bağlantılar -->
+                <div class="border-b border-gray-300">
+                    <button @click="toggleSection('baglanti')" class="sidebar-section-header">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-1.5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                            <span class="font-semibold text-xs">Bağlantılar</span>
+                        </div>
+                        <svg :class="{'rotate-180': !sections.baglanti}" class="w-3.5 h-3.5 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div v-show="sections.baglanti" class="bg-white">
+                        <Link v-if="y('cihaz_transfer')" :href="route('cihaz-transfer.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('cihaz-transfer.*')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2h-2.22l.123.489.804.804A1 1 0 0113 18H7a1 1 0 01-.707-1.707l.804-.804L7.22 15H5a2 2 0 01-2-2V5zm5.771 7H5V5h10v7H8.771z" clip-rule="evenodd"></path></svg>
+                            Cihazdan Veri Transferi
+                        </Link>
+                        <Link :href="route('baglanti.mobil')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/baglanti/mobil')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-violet-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7 2a2 2 0 00-2 2v12a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2H7zm3 14a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>
+                            Mobil Bağlantı
+                        </Link>
+                        <span class="sidebar-item text-gray-400 cursor-default">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-violet-400" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                            API Ayarları
+                            <span class="ml-auto text-[8px] bg-violet-100 text-violet-600 px-1.5 rounded font-bold">YAKINDA</span>
+                        </span>
                     </div>
                 </div>
 

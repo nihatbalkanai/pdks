@@ -273,7 +273,13 @@ class TopluIslemController extends Controller
         $personeller = Personel::withoutGlobalScopes()
             ->select('id','kart_no','ad','soyad','ulasim_tipi','servis_plaka','yol_parasi')
             ->get();
-        return Inertia::render('TopluIslemler/ServisYolAtama', ['personeller' => $personeller]);
+
+        $servisler = \App\Models\Servis::withCount('personeller')->get();
+
+        return Inertia::render('TopluIslemler/ServisYolAtama', [
+            'personeller' => $personeller,
+            'servisler' => $servisler,
+        ]);
     }
 
     public function servisYolAtamaUygula(Request $request)
