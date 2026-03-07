@@ -43,6 +43,45 @@ class PuantajHesaplamaController extends Controller
         ]);
     }
 
+    private function getPersonelList()
+    {
+        $firma_id = Auth::user()->firma_id;
+        return Personel::withoutGlobalScopes()
+            ->where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->select('id', 'ad', 'soyad', 'sicil_no', 'kart_no', 'bolum', 'puantaj_parametre_id')
+            ->orderBy('ad')
+            ->get();
+    }
+
+    public function genelMaasEkstresi()
+    {
+        return Inertia::render('HesapRaporlari/GenelMaasEkstresi', [
+            'personeller' => $this->getPersonelList(),
+        ]);
+    }
+
+    public function kisiBazindaMaasEkstresi()
+    {
+        return Inertia::render('HesapRaporlari/KisiBazindaMaasEkstresi', [
+            'personeller' => $this->getPersonelList(),
+        ]);
+    }
+
+    public function maasPusulasi()
+    {
+        return Inertia::render('HesapRaporlari/MaasPusulasi', [
+            'personeller' => $this->getPersonelList(),
+        ]);
+    }
+
+    public function grupBazliMaasEkstresi()
+    {
+        return Inertia::render('HesapRaporlari/GrupBazliMaasEkstresi', [
+            'personeller' => $this->getPersonelList(),
+        ]);
+    }
+
     public function hesapla(Request $request)
     {
         $request->validate([
@@ -144,7 +183,14 @@ class PuantajHesaplamaController extends Controller
             foreach ($izinler as $izin) {
                 $izinBaslangic = Carbon::parse($izin->tarih);
                 $izinBitis = Carbon::parse($izin->bitis_tarihi ?? $izin->tarih);
-                $izinTipiStr = ($izin->izinTuru && $izin->izinTuru->ucret_kesintisi_yapilacak_mi) ? 'ucretsiz' : 'ucretli';
+                $izinTuruAd = $izin->izinTuru ? mb_strtolower($izin->izinTuru->ad) : '';
+                
+                if (str_contains($izinTuruAd, 'rapor')) {
+                    $izinTipiStr = 'rapor';
+                } else {
+                    $izinTipiStr = ($izin->izinTuru && $izin->izinTuru->ucret_kesintisi_yapilacak_mi) ? 'ucretsiz' : 'ucretli';
+                }
+
                 for ($d = $izinBaslangic->copy(); $d->lte($izinBitis); $d->addDay()) {
                     $izinliGunler[$d->format('Y-m-d')] = $izinTipiStr;
                 }
@@ -183,6 +229,19 @@ class PuantajHesaplamaController extends Controller
                 $toplamEkOdeme = $ekKazanclar->sum('tutar');
             } catch (\Exception $e) {}
 
+            // ===== AYLIK RAPOR GÜN SAYISI KONTROLÜ =====
+            $aydakiToplamRaporGunu = 0;
+            foreach ($izinliGunler as $izinTarih => $tip) {
+                if ($tip === 'rapor') {
+                    $d = Carbon::parse($izinTarih);
+                    if ($d->between($baslangic, $bitis)) {
+                        // Seçili dönem veya ay içindeki toplam rapor günü sayılıyor
+                        // (Personelin aktif olup olmadığı günlük döngüde kontrol edilirken, burada genel bir sayı hesaplanır)
+                        $aydakiToplamRaporGunu++;
+                    }
+                }
+            }
+
             // ===== GÜN GÜN HESAPLAMA =====
             $gunler = [];
             $toplamTakvimGunu = 0;       // Kişinin aktif olduğu toplam takvim günü
@@ -195,6 +254,8 @@ class PuantajHesaplamaController extends Controller
             $resmiTatilGun = 0;
             $ucretsizIzinGun = 0;
             $ucretliIzinGun = 0;
+            
+            $gelinenGunSayisi = 0; // Yol parası vs. için işe gelinen gün sayısı
 
             for ($gun = $baslangic->copy(); $gun->lte($bitis); $gun->addDay()) {
                 $tarih = $gun->format('Y-m-d');
@@ -226,6 +287,7 @@ class PuantajHesaplamaController extends Controller
                     if ($giris && $cikis) {
                         $calismaDakika = max(0, abs($cikis->diffInMinutes($giris)) - $molaSuresi);
                     }
+                    $gelinenGunSayisi++; // Kişi bu gün giriş yapmış (işe gelmiş)
                 }
 
                 if ($izinTipi) {
@@ -233,6 +295,17 @@ class PuantajHesaplamaController extends Controller
                     if ($izinTipi === 'ucretsiz') {
                         $durum = 'ucretsiz_izin';
                         $ucretsizIzinGun++;
+                    } elseif ($izinTipi === 'rapor') {
+                        if ($aydakiToplamRaporGunu <= 2) {
+                            $durum = 'rapor_ucretli_firma';
+                            // Toplam rapor süresi 2 güne kadarsa TAMAMINI firma öder (maaştan kesilmez)
+                            $normalCalismaGun++;
+                        } else {
+                            $durum = 'rapor_sgk';
+                            // Toplam rapor süresi 3 gün veya üzeri ise TAMAMINI SGK öder
+                            // Maaş hesabına geçmemesi (düşmesi) için tamamı ücretsiz izin olarak sayılır
+                            $ucretsizIzinGun++;
+                        }
                     } else {
                         $durum = 'ucretli_izin';
                         $ucretliIzinGun++;
@@ -318,10 +391,13 @@ class PuantajHesaplamaController extends Controller
             }
 
             // ===== ÜCRET HESAPLAMALARI =====
-            // Normal Çalışma: Ücret = (Maaş/30) × Gösterim Gün (takvim günü bazlı, Excel uyumlu)
+            // Normal Çalışma: Ücret = (Maaş/30) × min(gösterimGün, standartGün)
+            // - Şubat (28 gün): min(28, 30) = 28 gün → normalUcret=(maaş/30)*28, gunFark=2 → toplam=30 gün ✓
+            // - Mart  (31 gün): min(31, 30) = 30 gün → normalUcret=(maaş/30)*30, gunFark=0 → toplam=30 gün ✓
             $normalSaat = $normalCalismaGun * $gunlukCalismaSaat;           // Dahili hesaplama (30 gün bazlı)
             $normalSaatGosterim = $normalCalismaGunGosterim * $gunlukCalismaSaat; // Gösterim saati (takvim günü bazlı)
-            $normalUcret = $gunlukUcret * $normalCalismaGunGosterim;        // Ücret de takvim günü bazlı
+            $normalUcretGun = min($normalCalismaGunGosterim, $standartAyGun); // 31-günlük aylarda 30'a indir
+            $normalUcret = $gunlukUcret * $normalUcretGun;                  // Ücret: standart bazlı (31-gün aşımı yok)
 
             // FM %50: saatlik × çarpan × saat
             $fm50SaatDecimal = round($fm50Dakika / 60, 2);
@@ -356,10 +432,29 @@ class PuantajHesaplamaController extends Controller
             }
             $gunFarkUcret = $gunlukUcret * $gunFarkGun;
 
+            // ===== YOL PARASI HESAPLAMA =====
+            $yolParasiTutar = 0;
+            if ($personel->ulasim_tipi === 'yol_parasi_gunluk') {
+                $yolParasiTutar = (float)($personel->yol_parasi ?? 0) * $gelinenGunSayisi;
+            } elseif ($personel->ulasim_tipi === 'yol_parasi_aylik') {
+                $yolParasiTutar = (float)($personel->yol_parasi ?? 0);
+            }
+
+            // ===== YEMEK ÜCRETİ HESAPLAMA =====
+            $yemekTutar = 0;
+            if ($personel->yemek_tipi === 'ucret') {
+                $yemekTutar = (float)($personel->yemek_ucreti ?? 0) * $gelinenGunSayisi;
+            }
+
+            // ===== ELDEN ÖDEME =====
+            $eldenOdeme = (float)($personel->elden_odeme ?? 0);
+
             // TOPLAM (Bankaya Yatan)
+            // NOT: $uiUcret (ücretsiz izin) normalCalismaGun içinde zaten düşüldüğünden burada tekrar çıkarılmaz.
+            // NOT: $uciUcret (ücretli izin) bilgi amaçlı gösterilir; Excel uyumluluğu için bankaya yatan toplama dahil değil.
             // SSK dahil/hariç ayarı: ssk_rapor_toplama_dahil (DB parametresi)
-            $toplam = $normalUcret + $fm50Ucret + $fm100Ucret + $uciUcret
-                    + $toplamEkOdeme + $gunFarkUcret
+            $toplam = $normalUcret + $fm50Ucret + $fm100Ucret
+                    + $toplamEkOdeme + $gunFarkUcret + $yolParasiTutar + $yemekTutar
                     + ($sskToplamaDahil ? $toplamSskOdemesi : 0)
                     - $devUcret - $toplamAvans - $toplamKesinti;
 
@@ -434,10 +529,12 @@ class PuantajHesaplamaController extends Controller
                     ],
                     'avans' => $fmtPara($toplamAvans),
                     'ek_odeme' => $fmtPara($toplamEkOdeme),
+                    'yol_parasi' => $fmtPara($yolParasiTutar),
+                    'yemek' => $fmtPara($yemekTutar),
                     'ssk_rapor_odemesi' => $fmtPara($toplamSskOdemesi),
                     'kesinti' => $fmtPara($toplamKesinti),
                     'gun_fark' => $fmtPara($gunFarkUcret),
-                    'elden_odeme' => $fmtPara($personel->elden_odeme ?? 0),
+                    'elden_odeme' => $fmtPara($eldenOdeme),
                     'toplam' => $fmtPara($toplam),
                 ],
                 'ozet' => [

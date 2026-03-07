@@ -280,7 +280,7 @@ class TopluIslemController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'ulasim_tipi' => 'required|in:servis,yol_parasi',
+            'ulasim_tipi' => 'required|in:servis,yol_parasi_gunluk,yol_parasi_aylik',
             'servis_plaka' => 'nullable|string|max:20',
             'yol_parasi' => 'nullable|numeric|min:0',
         ]);

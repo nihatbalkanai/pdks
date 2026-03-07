@@ -194,7 +194,7 @@ const excelExport = () => {
         'Kart No', 'Sicil No', 'Adı', 'Soyadı', 'Bölüm', 'Net Maaş', 'Giriş T.', 'Çıkış T.',
         'NORMAL ÇALIŞMA', '', '', 'FAZLA MESAİ %50', '', 'FAZLA MESAİ %100', '', '',
         'DEVAMSIZLIK', '', '', 'HAFTA TATİLİ', '', '', 'ÜCRETSİZ İZİN', '', '',
-        'ÜCRETLİ İZİN', '', '', 'Avans', 'Ek Ödeme', 'Gün Fark', 'Elden Ödenen', 'TOPLAM'
+        'ÜCRETLİ İZİN', '', '', 'Avans', 'Ek Ödeme', 'Yol Parası', 'Yemek', 'Gün Fark', 'Elden Ödenen', 'Kesinti', 'TOPLAM'
     ];
     hdr1Labels.forEach((label, ci) => {
         const addr = XLSX.utils.encode_cell({ r: 3, c: ci });
@@ -209,7 +209,7 @@ const excelExport = () => {
         '', '', '', '', '', '', '', '',
         'Gün', 'Saat', 'Ücret', 'Saat', 'Ücret', 'Gün', 'Saat', 'Ücret',
         'Gün', 'Saat', 'Ücret', 'Gün', 'Saat', 'Ücret', 'Gün', 'Saat', 'Ücret',
-        'Gün', 'Saat', 'Ücret', '', '', '', '', ''
+        'Gün', 'Saat', 'Ücret', '', '', '', '', '', '', '', ''
     ];
     hdr2Labels.forEach((label, ci) => {
         const addr = XLSX.utils.encode_cell({ r: 4, c: ci });
@@ -257,9 +257,12 @@ const excelExport = () => {
             // Diğer
             { v: parseNum(s.bordro.avans), t: 'n', z: '#,##0.00' },
             { v: parseNum(s.bordro.ek_odeme), t: 'n', z: '#,##0.00' },
+            { v: parseNum(s.bordro.yol_parasi), t: 'n', z: '#,##0.00' },
+            { v: parseNum(s.bordro.yemek), t: 'n', z: '#,##0.00' },
             { v: parseNum(s.bordro.gun_fark), t: 'n', z: '#,##0.00' },
-            { v: parseNum(s.elden_odeme), t: 'n', z: '#,##0.00' }, // 31. sütun
-            { v: parseNum(s.bordro.toplam), t: 'n', z: '#,##0.00' }, // 32. sütun
+            { v: parseNum(s.bordro.elden_odeme), t: 'n', z: '#,##0.00' },
+            { v: parseNum(s.bordro.kesinti), t: 'n', z: '#,##0.00' },
+            { v: parseNum(s.bordro.toplam), t: 'n', z: '#,##0.00' },
         ];
 
         vals.forEach((cell, ci) => {
@@ -283,8 +286,10 @@ const excelExport = () => {
 
     // Toplam satırı
     const topRow = data.length + 5;
-    const topVals = ['TOPLAM', '', '', '', '', '', '', ''];
-    for (let ci = 8; ci < 33; ci++) {
+    const topVals = ['TOPLAM', '', '', '', ''];
+    for (let ci = 5; ci < 36; ci++) {
+        // Tarih sütunlarını atla (6=Giriş T., 7=Çıkış T.)
+        if (ci === 6 || ci === 7) { topVals.push(''); continue; }
         let sum = 0;
         data.forEach((s, ri) => {
             const addr = XLSX.utils.encode_cell({ r: ri + 5, c: ci });
@@ -299,7 +304,7 @@ const excelExport = () => {
         const txt = ck ? 'FFFFFF' : colors.toplam.text;
         const isNum = typeof val === 'number';
         const saatCols = [9,11,14,17,20,23,26];
-        const ucretCols = [5,10,12,15,18,21,24,27,28,29,30,31,32];
+        const ucretCols = [5,10,12,15,18,21,24,27,28,29,30,31,32,33,34,35];
         let z = undefined;
         if (saatCols.includes(ci)) z = '[h]:mm';
         else if (ucretCols.includes(ci)) z = '#,##0.00';
@@ -311,14 +316,14 @@ const excelExport = () => {
     });
 
     // Aralık
-    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: topRow, c: 31 } });
+    ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: topRow, c: 35 } });
 
     // Sütun genişlikleri
     ws['!cols'] = [
         {wch:8}, {wch:10}, {wch:14}, {wch:14}, {wch:16}, {wch:12}, {wch:12}, {wch:12},
         {wch:6}, {wch:10}, {wch:12}, {wch:10}, {wch:12}, {wch:6}, {wch:10}, {wch:12},
         {wch:6}, {wch:10}, {wch:12}, {wch:6}, {wch:10}, {wch:12}, {wch:6}, {wch:10}, {wch:12},
-        {wch:6}, {wch:10}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:14}
+        {wch:6}, {wch:10}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:12}, {wch:14}
     ];
 
     // Satır yükseklikleri
@@ -326,8 +331,8 @@ const excelExport = () => {
 
     // Birleştirme
     ws['!merges'] = [
-        {s:{r:0,c:0}, e:{r:0,c:31}},
-        {s:{r:1,c:0}, e:{r:1,c:31}},
+        {s:{r:0,c:0}, e:{r:0,c:35}},
+        {s:{r:1,c:0}, e:{r:1,c:35}},
         {s:{r:3,c:8}, e:{r:3,c:10}},
         {s:{r:3,c:11}, e:{r:3,c:12}},
         {s:{r:3,c:13}, e:{r:3,c:15}},
@@ -337,7 +342,7 @@ const excelExport = () => {
         {s:{r:3,c:25}, e:{r:3,c:27}},
     ];
     for (let c = 0; c <= 7; c++) ws['!merges'].push({s:{r:3,c}, e:{r:4,c}});
-    for (let c = 28; c <= 31; c++) ws['!merges'].push({s:{r:3,c}, e:{r:4,c}});
+    for (let c = 28; c <= 35; c++) ws['!merges'].push({s:{r:3,c}, e:{r:4,c}});
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Puantaj');
@@ -366,10 +371,7 @@ const excelExport = () => {
 
             <div class="flex flex-1 overflow-hidden">
                 <!-- SOL: Personel Seçimi -->
-                <div class="w-64 border-r border-gray-300 flex flex-col bg-gray-50">
-                    <div class="px-3 py-1.5 bg-gradient-to-r from-blue-50 to-blue-100 border-b">
-                        <div class="font-bold text-blue-800 text-[11px]">Adım 1 <span class="font-normal text-gray-600 ml-1">Personel seçiniz</span></div>
-                    </div>
+                <div class="w-56 border-r border-gray-300 flex flex-col bg-gray-50 print:hidden">
                     <div class="px-2 py-1 border-b">
                         <input v-model="aramaText" type="text" placeholder="🔍 Ara..." class="w-full px-2 py-0.5 text-[11px] border border-gray-300 rounded focus:border-blue-400 outline-none" />
                     </div>
@@ -381,12 +383,12 @@ const excelExport = () => {
                     </div>
                     <div class="flex-1 overflow-y-auto">
                         <label v-for="p in filtrelenmisPersoneller" :key="p.id"
-                            class="flex items-start gap-2 px-2 py-1.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-[11px] transition">
-                            <input type="checkbox" :value="p.id" v-model="selectedPersonelIds" class="mt-0.5 flex-shrink-0 rounded border-gray-300 text-blue-600" />
-                            <div class="min-w-0"><div class="font-medium text-gray-800 truncate">{{ toTitleCase(p.ad + ' ' + p.soyad) }}</div></div>
+                            class="flex items-start gap-2 px-2 py-1 hover:bg-blue-50 cursor-pointer border-b border-gray-100 text-[11px]">
+                            <input type="checkbox" :value="p.id" v-model="selectedPersonelIds" class="mt-0.5 rounded border-gray-300 text-blue-600" />
+                            <span class="truncate">{{ toTitleCase(p.ad + ' ' + p.soyad) }}</span>
                         </label>
                     </div>
-                    <div class="px-2 py-1 bg-blue-50 border-t text-[10px] text-blue-600 font-medium">{{ selectedPersonelIds.length }} personel seçildi</div>
+                    <div class="px-2 py-1 bg-blue-50 border-t text-[10px] text-blue-600 font-medium">{{ selectedPersonelIds.length }} seçili</div>
                 </div>
 
                 <!-- SAĞ: Ayarlar + Sonuçlar -->
@@ -483,7 +485,11 @@ const excelExport = () => {
                                     <th colspan="3" class="bth bg-blue-100">ÜCRETLİ İZİN</th>
                                     <th rowspan="2" class="bth">Avans</th>
                                     <th rowspan="2" class="bth">Ek Ödeme</th>
+                                    <th rowspan="2" class="bth bg-emerald-100">Yol Parası</th>
+                                    <th rowspan="2" class="bth bg-teal-100">Yemek</th>
                                     <th rowspan="2" class="bth">Gün Fark</th>
+                                    <th rowspan="2" class="bth bg-amber-100">Elden Ödeme</th>
+                                    <th rowspan="2" class="bth bg-rose-100">Kesinti</th>
                                     <th rowspan="2" class="bth font-bold">TOPLAM</th>
                                 </tr>
                                 <tr class="bg-gray-100">
@@ -540,10 +546,14 @@ const excelExport = () => {
                                     <td class="btd bg-blue-50/50">{{ s.bordro.ucretli_izin.gun }}</td>
                                     <td class="btd bg-blue-50/50">{{ s.bordro.ucretli_izin.saat }}</td>
                                     <td class="btd bg-blue-50/50 text-right">{{ s.bordro.ucretli_izin.ucret }}</td>
-                                    <!-- Avans / Ek / Fark / Toplam -->
+                                    <!-- Avans / Ek / Yol / Yemek / Fark / Elden / Kesinti / Toplam -->
                                     <td class="btd text-right">{{ s.bordro.avans }}</td>
                                     <td class="btd text-right">{{ s.bordro.ek_odeme }}</td>
+                                    <td class="btd text-right bg-emerald-50/50">{{ s.bordro.yol_parasi }}</td>
+                                    <td class="btd text-right bg-teal-50/50">{{ s.bordro.yemek }}</td>
                                     <td class="btd text-right">{{ s.bordro.gun_fark }}</td>
+                                    <td class="btd text-right bg-amber-50/50">{{ s.bordro.elden_odeme }}</td>
+                                    <td class="btd text-right text-red-600 bg-rose-50/50">({{ s.bordro.kesinti }})</td>
                                     <td class="btd text-right font-bold">{{ s.bordro.toplam }}</td>
                                 </tr>
                             </tbody>
@@ -580,10 +590,14 @@ const excelExport = () => {
                                     <td class="btd bg-blue-100">{{ toplamGun(sonuclar.sonuclar, s => s.bordro.ucretli_izin.gun) }}</td>
                                     <td class="btd bg-blue-100">{{ toplamSaat(sonuclar.sonuclar, s => s.bordro.ucretli_izin.saat) }}</td>
                                     <td class="btd bg-blue-100 text-right">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.ucretli_izin.ucret) }}</td>
-                                    <!-- Avans / Ek / Fark / Toplam -->
+                                    <!-- Avans / Ek / Yol / Yemek / Fark / Elden / Kesinti / Toplam -->
                                     <td class="btd text-right">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.avans) }}</td>
                                     <td class="btd text-right">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.ek_odeme) }}</td>
+                                    <td class="btd text-right bg-emerald-100">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.yol_parasi) }}</td>
+                                    <td class="btd text-right bg-teal-100">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.yemek) }}</td>
                                     <td class="btd text-right">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.gun_fark) }}</td>
+                                    <td class="btd text-right bg-amber-100">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.elden_odeme) }}</td>
+                                    <td class="btd text-right bg-rose-100">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.kesinti) }}</td>
                                     <td class="btd text-right font-bold">{{ toplamUcret(sonuclar.sonuclar, s => s.bordro.toplam) }}</td>
                                 </tr>
                             </tfoot>

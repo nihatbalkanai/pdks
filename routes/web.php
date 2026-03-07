@@ -27,8 +27,12 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     Route::post('/personeller/{id}/resim', [\App\Http\Controllers\PersonelController::class, 'resimYukle'])->name('personeller.resim-yukle')->middleware('rol.yetki:personel_islemleri');
 
     // Hesap Raporları
-    Route::get('/hesap-raporlari/puantaj-hesaplama', [\App\Http\Controllers\PuantajHesaplamaController::class, 'index'])->name('hesap-raporlari.puantaj-hesaplama');
-    Route::post('/hesap-raporlari/puantaj-hesapla', [\App\Http\Controllers\PuantajHesaplamaController::class, 'hesapla'])->name('hesap-raporlari.puantaj-hesapla');
+    Route::get('/hesap-raporlari/puantaj-hesaplama', [\App\Http\Controllers\PuantajHesaplamaController::class, 'index'])->name('hesap-raporlari.puantaj-hesaplama')->middleware('rol.yetki:hesap_puantaj');
+    Route::post('/hesap-raporlari/puantaj-hesapla', [\App\Http\Controllers\PuantajHesaplamaController::class, 'hesapla'])->name('hesap-raporlari.puantaj-hesapla')->middleware('rol.yetki:hesap_puantaj');
+    Route::get('/hesap-raporlari/genel-maas-ekstresi', [\App\Http\Controllers\PuantajHesaplamaController::class, 'genelMaasEkstresi'])->name('hesap-raporlari.genel-maas-ekstresi')->middleware('rol.yetki:hesap_genel_maas');
+    Route::get('/hesap-raporlari/kisi-bazinda-maas-ekstresi', [\App\Http\Controllers\PuantajHesaplamaController::class, 'kisiBazindaMaasEkstresi'])->name('hesap-raporlari.kisi-bazinda-maas-ekstresi')->middleware('rol.yetki:hesap_kisi_maas');
+    Route::get('/hesap-raporlari/maas-pusulasi', [\App\Http\Controllers\PuantajHesaplamaController::class, 'maasPusulasi'])->name('hesap-raporlari.maas-pusulasi')->middleware('rol.yetki:hesap_maas_pusulasi');
+    Route::get('/hesap-raporlari/grup-bazli-maas-ekstresi', [\App\Http\Controllers\PuantajHesaplamaController::class, 'grupBazliMaasEkstresi'])->name('hesap-raporlari.grup-bazli-maas-ekstresi')->middleware('rol.yetki:hesap_grup_maas');
 
     // Cihaz İşlemleri
     Route::resource('cihazlar', \App\Http\Controllers\PdksCihaziController::class)->middleware('rol.yetki:cihaz_islemleri');
@@ -39,31 +43,31 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     Route::resource('subeler', \App\Http\Controllers\SubeController::class)->middleware([\App\Http\Middleware\FeatureGate::class.':şube_yönetimi', 'rol.yetki:subeler']);
     Route::resource('servisler', \App\Http\Controllers\ServisController::class)->middleware([\App\Http\Middleware\FeatureGate::class.':servis_takibi', 'rol.yetki:servisler']);
 
-    // Raporlar
-    Route::get('/raporlar', [\App\Http\Controllers\RaporController::class, 'index'])->name('raporlar.index')->middleware('rol.yetki:raporlar');
-    Route::post('/raporlar/export', [\App\Http\Controllers\RaporController::class, 'export'])->name('raporlar.export')->middleware('rol.yetki:raporlar');
-    Route::get('/raporlar/01', [\App\Http\Controllers\RaporController::class, 'r01'])->name('raporlar.r01');
-    Route::get('/raporlar/02', [\App\Http\Controllers\RaporController::class, 'r02'])->name('raporlar.r02');
-    Route::get('/raporlar/03', [\App\Http\Controllers\RaporController::class, 'r03'])->name('raporlar.r03');
-    Route::get('/raporlar/04', [\App\Http\Controllers\RaporController::class, 'r04'])->name('raporlar.r04');
-    Route::get('/raporlar/05', [\App\Http\Controllers\RaporController::class, 'r05'])->name('raporlar.r05');
-    Route::get('/raporlar/06', [\App\Http\Controllers\RaporController::class, 'r06'])->name('raporlar.r06');
-    Route::get('/raporlar/07', [\App\Http\Controllers\RaporController::class, 'r07'])->name('raporlar.r07');
-    Route::get('/raporlar/08', [\App\Http\Controllers\RaporController::class, 'r08'])->name('raporlar.r08');
-    Route::get('/raporlar/09', [\App\Http\Controllers\RaporController::class, 'r09'])->name('raporlar.r09');
-    Route::get('/raporlar/10', [\App\Http\Controllers\RaporController::class, 'r10'])->name('raporlar.r10');
-    Route::get('/raporlar/11', [\App\Http\Controllers\RaporController::class, 'r11'])->name('raporlar.r11');
-    Route::get('/raporlar/12', [\App\Http\Controllers\RaporController::class, 'r12'])->name('raporlar.r12');
-    Route::get('/raporlar/13', [\App\Http\Controllers\RaporController::class, 'r13'])->name('raporlar.r13');
-    Route::get('/raporlar/14', [\App\Http\Controllers\RaporController::class, 'r14'])->name('raporlar.r14');
-    Route::get('/raporlar/15', [\App\Http\Controllers\RaporController::class, 'r15'])->name('raporlar.r15');
-    Route::get('/raporlar/16', [\App\Http\Controllers\RaporController::class, 'r16'])->name('raporlar.r16');
-    Route::get('/raporlar/17', [\App\Http\Controllers\RaporController::class, 'r17'])->name('raporlar.r17');
-    Route::get('/raporlar/18', [\App\Http\Controllers\RaporController::class, 'r18'])->name('raporlar.r18');
-    Route::get('/raporlar/19', [\App\Http\Controllers\RaporController::class, 'r19'])->name('raporlar.r19');
-    Route::get('/raporlar/20', [\App\Http\Controllers\RaporController::class, 'r20'])->name('raporlar.r20');
-    Route::get('/raporlar/21', [\App\Http\Controllers\RaporController::class, 'r21'])->name('raporlar.r21');
-    Route::get('/raporlar/22', [\App\Http\Controllers\RaporController::class, 'r22'])->name('raporlar.r22');
+    // Genel Raporlar (Özlük / Devam)
+    Route::get('/raporlar', [\App\Http\Controllers\RaporController::class, 'index'])->name('raporlar.index')->middleware('rol.yetki:genel_raporlar');
+    Route::post('/raporlar/export', [\App\Http\Controllers\RaporController::class, 'export'])->name('raporlar.export')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/01', [\App\Http\Controllers\RaporController::class, 'r01'])->name('raporlar.r01')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/02', [\App\Http\Controllers\RaporController::class, 'r02'])->name('raporlar.r02')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/03', [\App\Http\Controllers\RaporController::class, 'r03'])->name('raporlar.r03')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/04', [\App\Http\Controllers\RaporController::class, 'r04'])->name('raporlar.r04')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/05', [\App\Http\Controllers\RaporController::class, 'r05'])->name('raporlar.r05')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/06', [\App\Http\Controllers\RaporController::class, 'r06'])->name('raporlar.r06')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/07', [\App\Http\Controllers\RaporController::class, 'r07'])->name('raporlar.r07')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/08', [\App\Http\Controllers\RaporController::class, 'r08'])->name('raporlar.r08')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/09', [\App\Http\Controllers\RaporController::class, 'r09'])->name('raporlar.r09')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/10', [\App\Http\Controllers\RaporController::class, 'r10'])->name('raporlar.r10')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/11', [\App\Http\Controllers\RaporController::class, 'r11'])->name('raporlar.r11')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/12', [\App\Http\Controllers\RaporController::class, 'r12'])->name('raporlar.r12')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/13', [\App\Http\Controllers\RaporController::class, 'r13'])->name('raporlar.r13')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/14', [\App\Http\Controllers\RaporController::class, 'r14'])->name('raporlar.r14')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/15', [\App\Http\Controllers\RaporController::class, 'r15'])->name('raporlar.r15')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/16', [\App\Http\Controllers\RaporController::class, 'r16'])->name('raporlar.r16')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/17', [\App\Http\Controllers\RaporController::class, 'r17'])->name('raporlar.r17')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/18', [\App\Http\Controllers\RaporController::class, 'r18'])->name('raporlar.r18')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/19', [\App\Http\Controllers\RaporController::class, 'r19'])->name('raporlar.r19')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/20', [\App\Http\Controllers\RaporController::class, 'r20'])->name('raporlar.r20')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/21', [\App\Http\Controllers\RaporController::class, 'r21'])->name('raporlar.r21')->middleware('rol.yetki:genel_raporlar');
+    Route::get('/raporlar/22', [\App\Http\Controllers\RaporController::class, 'r22'])->name('raporlar.r22')->middleware('rol.yetki:genel_raporlar');
 
 
     // Ek Kazançlar
@@ -208,10 +212,38 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
 });
 
 // Super Admin Routes
-Route::middleware(['auth', 'superadmin'])->prefix('super-admin')->group(function () {
-    Route::get('/', [\App\Http\Controllers\SuperAdminController::class, 'index'])->name('super-admin.index');
-    Route::post('/firmalar/{id}/abonelik', [\App\Http\Controllers\SuperAdminController::class, 'updateAbonelik'])->name('super-admin.firmalar.abonelik');
-    Route::post('/adminler/{id}/yetki', [\App\Http\Controllers\SuperAdminController::class, 'updateAdminYetki'])->name('super-admin.adminler.yetki');
+Route::middleware(['auth', 'superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\SuperAdminController::class, 'index'])->name('index');
+    Route::get('/firmalar/{id}', [\App\Http\Controllers\SuperAdminController::class, 'firmaDetay'])->name('firmalar.detay');
+    Route::put('/firmalar/{id}', [\App\Http\Controllers\SuperAdminController::class, 'firmaGuncelle'])->name('firmalar.guncelle');
+    Route::delete('/firmalar/{id}', [\App\Http\Controllers\SuperAdminController::class, 'firmaSil'])->name('firmalar.sil');
+    Route::post('/firmalar/{id}/abonelik', [\App\Http\Controllers\SuperAdminController::class, 'updateAbonelik'])->name('firmalar.abonelik');
+    Route::post('/firmalar/{id}/impersonate', [\App\Http\Controllers\SuperAdminController::class, 'impersonate'])->name('firmalar.impersonate');
+    Route::post('/firmalar/olustur', [\App\Http\Controllers\SuperAdminController::class, 'firmaOlustur'])->name('firmalar.olustur');
+    Route::post('/impersonate-leave', [\App\Http\Controllers\SuperAdminController::class, 'impersonateLeave'])->name('impersonate-leave');
+    Route::post('/adminler/{id}/yetki', [\App\Http\Controllers\SuperAdminController::class, 'updateAdminYetki'])->name('adminler.yetki');
+    // Duyurular
+    Route::get('/duyurular', [\App\Http\Controllers\SuperAdminController::class, 'duyurular'])->name('duyurular.index');
+    Route::post('/duyurular', [\App\Http\Controllers\SuperAdminController::class, 'duyuruGonder'])->name('duyurular.gonder');
+    Route::delete('/duyurular/{id}', [\App\Http\Controllers\SuperAdminController::class, 'duyuruSil'])->name('duyurular.sil');
+    // Paket Yönetimi
+    Route::get('/paketler', [\App\Http\Controllers\SuperAdminController::class, 'paketler'])->name('paketler.index');
+    Route::put('/paketler/{id}', [\App\Http\Controllers\SuperAdminController::class, 'paketGuncelle'])->name('paketler.guncelle');
+    // Aktivite Logları
+    Route::get('/aktivite-loglar', [\App\Http\Controllers\SuperAdminController::class, 'aktiviteLoglar'])->name('aktivite-loglar');
+    // Destek Biletleri (Super Admin tarafı)
+    Route::get('/destek-biletleri', [\App\Http\Controllers\DestekBiletController::class, 'tumBiletler'])->name('destek.index');
+    Route::get('/destek-biletleri/{id}', [\App\Http\Controllers\DestekBiletController::class, 'detay'])->name('destek.detay');
+    Route::post('/destek-biletleri/{id}/mesaj', [\App\Http\Controllers\DestekBiletController::class, 'mesajGonder'])->name('destek.mesaj');
+    Route::put('/destek-biletleri/{id}/durum', [\App\Http\Controllers\DestekBiletController::class, 'durumGuncelle'])->name('destek.durum');
+});
+
+// Destek Biletleri (Firma kullanıcı tarafı)
+Route::middleware(['auth'])->prefix('destek')->name('destek.firma.')->group(function () {
+    Route::get('/', [\App\Http\Controllers\DestekBiletController::class, 'index'])->name('index');
+    Route::post('/', [\App\Http\Controllers\DestekBiletController::class, 'olustur'])->name('olustur');
+    Route::get('/{id}', [\App\Http\Controllers\DestekBiletController::class, 'detay'])->name('detay');
+    Route::post('/{id}/mesaj', [\App\Http\Controllers\DestekBiletController::class, 'mesajGonder'])->name('mesaj');
 });
 
 require __DIR__.'/auth.php';

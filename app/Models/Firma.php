@@ -24,6 +24,11 @@ class Firma extends Model
         'paket_tipi',
     ];
 
+    protected $casts = [
+        'durum' => 'boolean',
+        'abonelik_bitis_tarihi' => 'date',
+    ];
+
     public function uniqueIds(): array
     {
         return ['uuid'];
@@ -32,5 +37,28 @@ class Firma extends Model
     public function paket()
     {
         return $this->belongsTo(Paket::class, 'paket_id');
+    }
+
+    public function kullanicilar()
+    {
+        return $this->hasMany(Kullanici::class, 'firma_id');
+    }
+
+    public function personeller()
+    {
+        return $this->hasMany(Personel::class, 'firma_id');
+    }
+
+    public function cihazlar()
+    {
+        return $this->hasMany(PdksCihazi::class, 'firma_id');
+    }
+
+    // Abonelik aktif mi?
+    public function abonelikAktifMi(): bool
+    {
+        if (!$this->durum) return false;
+        if (!$this->abonelik_bitis_tarihi) return true; // Sınırsız
+        return $this->abonelik_bitis_tarihi->isFuture();
     }
 }

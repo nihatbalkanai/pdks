@@ -11,6 +11,18 @@ const hasUnread = ref(bildirimler.value.length > 0);
 const yetkiler = page.props.auth.yetkiler || {};
 const y = (key) => yetkiler[key] ?? false;
 
+// Platform Duyuruları
+const platformDuyurulari = ref([...(page.props.platformDuyurulari || [])]);
+const closedDuyurular = ref(JSON.parse(localStorage.getItem('pdks_closed_duyurular') || '[]'));
+const visibleDuyurular = ref(platformDuyurulari.value.filter(d => !closedDuyurular.value.includes(d.id)));
+const closeDuyuru = (id) => {
+    closedDuyurular.value.push(id);
+    localStorage.setItem('pdks_closed_duyurular', JSON.stringify(closedDuyurular.value));
+    visibleDuyurular.value = visibleDuyurular.value.filter(d => d.id !== id);
+};
+const duyuruTipRenk = { bilgi: '#3b82f6', uyari: '#f59e0b', bakim: '#ef4444', guncelleme: '#10b981' };
+const duyuruTipIcon = { bilgi: 'ℹ️', uyari: '⚠️', bakim: '🔧', guncelleme: '🚀' };
+
 // Accordion durumları - localStorage'dan oku
 const loadSections = () => {
     try {
@@ -56,6 +68,29 @@ onUnmounted(() => {
 
 <template>
     <div class="flex flex-col h-screen bg-gray-200 font-sans text-sm select-none">
+        <!-- IMPERSONATE BANNER -->
+        <div v-if="page.props.impersonate?.aktif" class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-1.5 flex items-center justify-between text-xs font-semibold z-50">
+            <div class="flex items-center gap-2">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                <span>🔑 <b>{{ page.props.impersonate.firmaAdi }}</b> firması olarak giriş yaptınız</span>
+            </div>
+            <form method="POST" :action="route('super-admin.impersonate-leave')">
+                <input type="hidden" name="_token" :value="page.props.csrf_token || document.querySelector('meta[name=csrf-token]')?.content" />
+                <button type="submit" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg transition font-bold">
+                    ← Kendi Hesabıma Dön
+                </button>
+            </form>
+        </div>
+
+        <!-- PLATFORM DUYURULARI BANNER -->
+        <div v-for="d in visibleDuyurular" :key="d.id" class="px-4 py-2 flex items-center justify-between text-xs font-medium z-40" :style="{ backgroundColor: duyuruTipRenk[d.tip] + '15', borderBottom: '1px solid ' + duyuruTipRenk[d.tip] + '30' }">
+            <div class="flex items-center gap-2 flex-1">
+                <span class="text-base">{{ duyuruTipIcon[d.tip] || '📢' }}</span>
+                <span class="font-bold" :style="{ color: duyuruTipRenk[d.tip] }">{{ d.baslik }}</span>
+                <span class="text-gray-600 truncate max-w-[400px]">{{ d.icerik }}</span>
+            </div>
+            <button @click="closeDuyuru(d.id)" class="text-gray-400 hover:text-gray-600 p-1 transition" title="Kapat">✕</button>
+        </div>
         <!-- ÜST MENÜ ÇUBUĞU (Klasik Windows Stil) -->
         <div class="bg-gradient-to-b from-[#eef3fa] to-[#dce6f4] border-b border-[#a0b0cc] px-1 flex items-center h-7 text-xs">
             <Dropdown align="left" width="48">
@@ -63,16 +98,92 @@ onUnmounted(() => {
                     <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Dosya</button>
                 </template>
                 <template #content>
+                    <DropdownLink v-if="page.props.auth?.isSuperAdmin" :href="route('super-admin.index')">🛡️ Platform Yönetimi</DropdownLink>
                     <DropdownLink :href="route('profile.edit')">Profil Ayarları</DropdownLink>
                     <DropdownLink :href="route('logout')" method="post" as="button">Çıkış Yap</DropdownLink>
                 </template>
             </Dropdown>
-            <Link :href="route('personeller.index')" class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Personel İşlemleri</Link>
-            <Link :href="route('raporlar.index')" class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Hesap Raporları</Link>
-            <span class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition cursor-pointer">Toplu İşlemler</span>
-            <span class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition cursor-pointer">Tanım İşlemleri</span>
-            <span class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition cursor-pointer">Araçlar</span>
-            <span class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition cursor-pointer">Yardım</span>
+            <Dropdown align="left" width="56">
+                <template #trigger>
+                    <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Personel İşlemleri</button>
+                </template>
+                <template #content>
+                    <DropdownLink :href="route('personeller.index')">Personel Kartları</DropdownLink>
+                    <DropdownLink v-if="y('ek_kazanclar')" :href="route('ek-kazanclar.index')">Ek Kazançlar</DropdownLink>
+                    <DropdownLink v-if="y('avans_kesintiler')" :href="route('avans-kesintiler.index')">Kesintiler</DropdownLink>
+                    <DropdownLink v-if="y('cihaz_transfer')" :href="route('cihaz-transfer.index')">Cihazdan Veri Transferi</DropdownLink>
+                </template>
+            </Dropdown>
+            <Dropdown v-if="y('hesap_raporlari')" align="left" width="56">
+                <template #trigger>
+                    <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Hesap Raporları</button>
+                </template>
+                <template #content>
+                    <DropdownLink v-if="y('hesap_puantaj')" :href="route('hesap-raporlari.puantaj-hesaplama')">01. Puantaj Hesaplama</DropdownLink>
+                    <DropdownLink v-if="y('hesap_genel_maas')" :href="route('hesap-raporlari.genel-maas-ekstresi')">02. Genel Bazda Maaş Ekstresi</DropdownLink>
+                    <DropdownLink v-if="y('hesap_kisi_maas')" :href="route('hesap-raporlari.kisi-bazinda-maas-ekstresi')">03. Kişi Bazında Maaş Ekstresi</DropdownLink>
+                    <DropdownLink v-if="y('hesap_maas_pusulasi')" :href="route('hesap-raporlari.maas-pusulasi')">04. Maaş Pusulası</DropdownLink>
+                    <DropdownLink v-if="y('hesap_grup_maas')" :href="route('hesap-raporlari.grup-bazli-maas-ekstresi')">05. Grup Bazlı Maaş Ekstresi</DropdownLink>
+                </template>
+            </Dropdown>
+            <Dropdown v-if="y('toplu_islemler')" align="left" width="56">
+                <template #trigger>
+                    <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Toplu İşlemler</button>
+                </template>
+                <template #content>
+                    <DropdownLink v-if="y('toplu_maas')" :href="route('toplu-islemler.maas-artirimi')">Toplu Maaş Artırımı</DropdownLink>
+                    <DropdownLink v-if="y('toplu_hareket')" :href="route('toplu-islemler.hareket')">Toplu Hareket İşlemi</DropdownLink>
+                    <DropdownLink v-if="y('toplu_izin')" :href="route('toplu-islemler.izin')">Toplu İzin İşlemi</DropdownLink>
+                    <DropdownLink v-if="y('toplu_avans')" :href="route('toplu-islemler.avans')">Toplu Avans İşlemi</DropdownLink>
+                    <DropdownLink v-if="y('toplu_prim')" :href="route('toplu-islemler.prim')">Toplu Prim İşlemi</DropdownLink>
+                    <DropdownLink v-if="y('toplu_yemek')" :href="route('toplu-islemler.yemek-atama')">Toplu Yemek Atama</DropdownLink>
+                    <DropdownLink v-if="y('toplu_servis_yol')" :href="route('toplu-islemler.servis-yol-atama')">Toplu Servis / Yol Parası</DropdownLink>
+                    <DropdownLink v-if="y('toplu_giris_cikis')" :href="route('toplu-islemler.giris-cikis-duzenleme')">Toplu Giriş Çıkış Düzenleme</DropdownLink>
+                    <DropdownLink v-if="y('toplu_mesaj')" :href="route('toplu-islemler.toplu-mesaj')">Toplu Mesaj Gönderimi</DropdownLink>
+                    <DropdownLink v-if="y('toplu_mail')" :href="route('toplu-islemler.toplu-mail')">Toplu Mail Gönderimi</DropdownLink>
+                    <DropdownLink v-if="y('zamanlanmis_bildirimler')" :href="route('toplu-islemler.zamanlanmis-bildirimler')">Zamanlanmış Bildirimler</DropdownLink>
+                </template>
+            </Dropdown>
+            <Dropdown v-if="y('tanim_islemleri')" align="left" width="56">
+                <template #trigger>
+                    <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Tanım İşlemleri</button>
+                </template>
+                <template #content>
+                    <DropdownLink :href="route('tanim.kodlar', 'sirket')">Şirket Tanımlama</DropdownLink>
+                    <DropdownLink :href="route('tanim.kodlar', 'departman')">Departman Tanımlama</DropdownLink>
+                    <DropdownLink :href="route('tanim.kodlar', 'bolum')">Bölüm Tanımlama</DropdownLink>
+                    <DropdownLink :href="route('tanim.kodlar', 'odeme')">Ödeme Tanımlama</DropdownLink>
+                    <DropdownLink :href="route('tanim.kodlar', 'servis')">Servis Tanımlama</DropdownLink>
+                    <DropdownLink :href="route('tanim.kodlar', 'hesap_gurubu')">Hesap Grubu Tanımlama</DropdownLink>
+                    <DropdownLink :href="route('tanim.kullanicilar')">Kullanıcılar</DropdownLink>
+                    <DropdownLink :href="route('tanim.mail-ayarlari')">Mail Ayarları</DropdownLink>
+                    <DropdownLink :href="route('tanim.mesaj-ayarlari')">Mesaj (SMS) Ayarları</DropdownLink>
+                </template>
+            </Dropdown>
+            <Dropdown v-if="y('tanim_islemleri')" align="left" width="56">
+                <template #trigger>
+                    <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Araçlar</button>
+                </template>
+                <template #content>
+                    <DropdownLink :href="route('tanim.calisma-plani.index')">Genel Gruplar Çalışma Planı</DropdownLink>
+                    <DropdownLink :href="route('tanim.puantaj-parametreleri.index')">Aylık Puantaj Parametreleri</DropdownLink>
+                    <DropdownLink :href="route('tanim.tatil-izin.index')">Tatil ve İzin Tanımlamaları</DropdownLink>
+                    <DropdownLink :href="route('tanim.gunluk-puantaj.index')">Günlük Puantaj Parametreleri</DropdownLink>
+                    <DropdownLink :href="route('tanim.bordro-alanlari.index')">Bordro Alanı Tanımlamaları</DropdownLink>
+                    <DropdownLink :href="route('tanim.vardiyalar.index')">Vardiya Tanımları</DropdownLink>
+                    <DropdownLink :href="route('tanim.personel-calisma-plan.index')">Personele Özel Çalışma Planları</DropdownLink>
+                    <DropdownLink :href="route('tanim.personel-izin.index')">Personel İzin Yönetimi</DropdownLink>
+                </template>
+            </Dropdown>
+            <Dropdown align="left" width="48">
+                <template #trigger>
+                    <button class="px-3 py-0.5 hover:bg-[#c8d8ee] rounded-sm transition">Yardım</button>
+                </template>
+                <template #content>
+                    <DropdownLink :href="route('dashboard')">Ana Sayfa</DropdownLink>
+                    <DropdownLink href="https://techsend.io" target="_blank">Hakkında</DropdownLink>
+                </template>
+            </Dropdown>
             
             <!-- Sağ taraf: Kullanıcı ve Bildirim -->
             <div class="ml-auto flex items-center space-x-2">
@@ -355,7 +466,7 @@ onUnmounted(() => {
                     </div>
                 </div>
                 
-                <div class="border-b border-gray-300">
+                <div v-if="y('genel_raporlar')" class="border-b border-gray-300">
                     <button @click="toggleSection('rapor_ozluk')" class="sidebar-section-header">
                         <div class="flex items-center">
                             <svg class="w-4 h-4 mr-1.5 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clip-rule="evenodd"></path></svg>
@@ -389,7 +500,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <div class="border-b border-gray-300">
+                <div v-if="y('hesap_raporlari')" class="border-b border-gray-300">
                     <button @click="toggleSection('rapor_hesap')" class="sidebar-section-header">
                         <div class="flex items-center">
                             <svg class="w-4 h-4 mr-1.5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm1 8a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"></path></svg>
@@ -398,11 +509,11 @@ onUnmounted(() => {
                         <svg :class="{'rotate-180': !sections.rapor_hesap}" class="w-3.5 h-3.5 transition-transform text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                     </button>
                     <div v-show="sections.rapor_hesap" class="px-1 py-1">
-                        <a :href="route('hesap-raporlari.puantaj-hesaplama')" class="report-item report-item-hesap">Puantaj Hesaplama</a>
-                        <a href="#" class="report-item report-item-hesap">02. Genel Bazda Maaş Ekstresi</a>
-                        <a href="#" class="report-item report-item-hesap">03. Kişi Bazında Maaş Ekstresi</a>
-                        <a href="#" class="report-item report-item-hesap">04. Maaş Pusulası</a>
-                        <a href="#" class="report-item report-item-hesap">05. Grup Bazlı Maaş Ekstresi</a>
+                        <a v-if="y('hesap_puantaj')" :href="route('hesap-raporlari.puantaj-hesaplama')" class="report-item report-item-hesap">01. Puantaj Hesaplama</a>
+                        <a v-if="y('hesap_genel_maas')" :href="route('hesap-raporlari.genel-maas-ekstresi')" class="report-item report-item-hesap">02. Genel Bazda Maaş Ekstresi</a>
+                        <a v-if="y('hesap_kisi_maas')" :href="route('hesap-raporlari.kisi-bazinda-maas-ekstresi')" class="report-item report-item-hesap">03. Kişi Bazında Maaş Ekstresi</a>
+                        <a v-if="y('hesap_maas_pusulasi')" :href="route('hesap-raporlari.maas-pusulasi')" class="report-item report-item-hesap">04. Maaş Pusulası</a>
+                        <a v-if="y('hesap_grup_maas')" :href="route('hesap-raporlari.grup-bazli-maas-ekstresi')" class="report-item report-item-hesap">05. Grup Bazlı Maaş Ekstresi</a>
                     </div>
                 </div>
             </aside>

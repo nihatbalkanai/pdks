@@ -352,6 +352,9 @@ watch(() => form.izin_turu_id, () => {
                     <div v-else-if="!izinTuruBilgisi.hafta_sonu_haric && !izinTuruBilgisi.resmi_tatil_haric" class="text-gray-500">
                         ℹ Bu izin türünde takvim günü olarak sayılır (hafta sonu ve tatiller dahil)
                     </div>
+                    <div v-if="izinTuruBilgisi && izinTuruBilgisi.izin_turu_ad && izinTuruBilgisi.izin_turu_ad.toLowerCase().includes('rapor')" class="mt-1 pt-1 border-t border-blue-200 text-blue-700 font-medium">
+                        <span class="text-blue-500 mr-1">ℹ</span> SGK Kuralı: Toplam rapor süresi 2 güne kadarsa firma öder (maaştan kesilmez). Toplam rapor 3 gün ve üzeri ise TAMAMI SGK tarafından ödenir ve maaştan kesilir.
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-3 gap-3">

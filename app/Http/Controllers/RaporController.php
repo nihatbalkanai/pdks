@@ -15,6 +15,14 @@ use Inertia\Inertia;
 
 class RaporController extends Controller
 {
+    // Rapor ana sayfa
+    public function index()
+    {
+        return Inertia::render('Raporlar/Index', [
+            'personeller' => $this->personelListesi(),
+        ]);
+    }
+
     // Firma ID yardımcı
     private function firmaId() { return Auth::user()->firma_id ?? 1; }
 

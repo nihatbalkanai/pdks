@@ -855,11 +855,14 @@ const uploadResim = async (event) => {
                                                     </select>
                                                 </div>
                                                 <div class="form-group">
-                                                    <label v-if="selectedPersonel.yemek_tipi === 'kart'">Yemek Kart No</label>
-                                                    <input v-if="selectedPersonel.yemek_tipi === 'kart'" v-model="selectedPersonel.yemek_kart_no" class="form-input" placeholder="1234-5678" />
-                                                    
-                                                    <label v-else-if="selectedPersonel.yemek_tipi === 'ucret'">Yemek Ücreti (₺/gün)</label>
-                                                    <input v-else-if="selectedPersonel.yemek_tipi === 'ucret'" v-model="selectedPersonel.yemek_ucreti" type="number" step="0.01" class="form-input text-right" placeholder="150.00" />
+                                                    <template v-if="selectedPersonel.yemek_tipi === 'kart'">
+                                                        <label>Yemek Kart No</label>
+                                                        <input v-model="selectedPersonel.yemek_kart_no" class="form-input" placeholder="1234-5678" />
+                                                    </template>
+                                                    <template v-else-if="selectedPersonel.yemek_tipi === 'ucret'">
+                                                        <label>Yemek Ücreti (₺/gün)</label>
+                                                        <input v-model="selectedPersonel.yemek_ucreti" type="number" step="0.01" class="form-input text-right" placeholder="150.00" />
+                                                    </template>
                                                 </div>
 
                                                 <!-- Ulaşım -->
@@ -868,15 +871,23 @@ const uploadResim = async (event) => {
                                                     <select v-model="selectedPersonel.ulasim_tipi" class="form-input">
                                                         <option :value="null">— Yok —</option>
                                                         <option value="servis">🚌 Servis</option>
-                                                        <option value="yol_parasi">💵 Yol Parası</option>
+                                                        <option value="yol_parasi_gunluk">💵 Günlük Yol Parası</option>
+                                                        <option value="yol_parasi_aylik">💵 Aylık Yol Parası</option>
                                                     </select>
                                                 </div>
                                                 <div class="form-group">
-                                                    <label v-if="selectedPersonel.ulasim_tipi === 'servis'">Servis Plaka</label>
-                                                    <input v-if="selectedPersonel.ulasim_tipi === 'servis'" v-model="selectedPersonel.servis_plaka" class="form-input" placeholder="34 ABC 123" />
-                                                    
-                                                    <label v-else-if="selectedPersonel.ulasim_tipi === 'yol_parasi'">Yol Parası (₺/gün)</label>
-                                                    <input v-else-if="selectedPersonel.ulasim_tipi === 'yol_parasi'" v-model="selectedPersonel.yol_parasi" type="number" step="0.01" class="form-input text-right" placeholder="75.00" />
+                                                    <template v-if="selectedPersonel.ulasim_tipi === 'servis'">
+                                                        <label>Servis Plaka</label>
+                                                        <input v-model="selectedPersonel.servis_plaka" class="form-input" placeholder="34 ABC 123" />
+                                                    </template>
+                                                    <template v-else-if="selectedPersonel.ulasim_tipi === 'yol_parasi_gunluk'">
+                                                        <label>Günlük Yol Parası (₺/gün)</label>
+                                                        <input v-model="selectedPersonel.yol_parasi" type="number" step="0.01" class="form-input text-right" placeholder="75.00" />
+                                                    </template>
+                                                    <template v-else-if="selectedPersonel.ulasim_tipi === 'yol_parasi_aylik'">
+                                                        <label>Aylık Yol Parası (₺/ay)</label>
+                                                        <input v-model="selectedPersonel.yol_parasi" type="number" step="0.01" class="form-input text-right" placeholder="1500.00" />
+                                                    </template>
                                                 </div>
                                             </div>
                                         </div>

@@ -101,7 +101,7 @@ class PersonelController extends Controller
             'yemek_tipi' => 'nullable|in:kart,ucret',
             'yemek_kart_no' => 'nullable|string|max:50',
             'yemek_ucreti' => 'nullable|numeric|min:0',
-            'ulasim_tipi' => 'nullable|in:servis,yol_parasi',
+            'ulasim_tipi' => 'nullable|in:servis,yol_parasi_gunluk,yol_parasi_aylik',
             'servis_plaka' => 'nullable|string|max:20',
             'yol_parasi' => 'nullable|numeric|min:0',
         ]);
@@ -324,7 +324,7 @@ class PersonelController extends Controller
             'yemek_tipi' => 'nullable|in:kart,ucret',
             'yemek_kart_no' => 'nullable|string|max:50',
             'yemek_ucreti' => 'nullable|numeric|min:0',
-            'ulasim_tipi' => 'nullable|in:servis,yol_parasi',
+            'ulasim_tipi' => 'nullable|in:servis,yol_parasi_gunluk,yol_parasi_aylik',
             'servis_plaka' => 'nullable|string|max:20',
             'yol_parasi' => 'nullable|numeric|min:0',
         ]);

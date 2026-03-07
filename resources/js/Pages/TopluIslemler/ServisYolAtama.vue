@@ -34,14 +34,16 @@ const toggleAll = () => {
 
 const ulasimDurum = (p) => {
     if (p.ulasim_tipi === 'servis') return `🚌 ${p.servis_plaka || '-'}`;
-    if (p.ulasim_tipi === 'yol_parasi') return `💵 ${Number(p.yol_parasi || 0).toLocaleString('tr-TR')} ₺/gün`;
+    if (p.ulasim_tipi === 'yol_parasi_gunluk') return `💵 ${Number(p.yol_parasi || 0).toLocaleString('tr-TR')} ₺/gün`;
+    if (p.ulasim_tipi === 'yol_parasi_aylik') return `💵 ${Number(p.yol_parasi || 0).toLocaleString('tr-TR')} ₺/ay`;
     return '—';
 };
 
 const submit = () => {
     if (selectedIds.value.length === 0) { Swal.fire('Uyarı', 'Lütfen en az bir personel seçin.', 'warning'); return; }
     if (ulasimTipi.value === 'servis' && !form.servis_plaka) { Swal.fire('Uyarı', 'Lütfen servis plaka numarası girin.', 'warning'); return; }
-    if (ulasimTipi.value === 'yol_parasi' && !form.yol_parasi) { Swal.fire('Uyarı', 'Lütfen günlük yol parası girin.', 'warning'); return; }
+    if (ulasimTipi.value === 'yol_parasi_gunluk' && !form.yol_parasi) { Swal.fire('Uyarı', 'Lütfen günlük yol parası girin.', 'warning'); return; }
+    if (ulasimTipi.value === 'yol_parasi_aylik' && !form.yol_parasi) { Swal.fire('Uyarı', 'Lütfen aylık yol parası girin.', 'warning'); return; }
 
     form.personel_ids = selectedIds.value;
     form.ulasim_tipi = ulasimTipi.value;
@@ -120,11 +122,19 @@ const submit = () => {
                                     </div>
                                 </label>
                                 <label class="flex items-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition"
-                                    :class="ulasimTipi === 'yol_parasi' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'">
-                                    <input type="radio" v-model="ulasimTipi" value="yol_parasi" class="text-blue-600" />
+                                    :class="ulasimTipi === 'yol_parasi_gunluk' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'">
+                                    <input type="radio" v-model="ulasimTipi" value="yol_parasi_gunluk" class="text-blue-600" />
                                     <div>
-                                        <div class="text-sm font-bold">💵 Yol Parası</div>
+                                        <div class="text-sm font-bold">💵 Günlük Yol Parası</div>
                                         <div class="text-[10px] text-gray-500">Günlük yol parası atanır</div>
+                                    </div>
+                                </label>
+                                <label class="flex items-center gap-2 px-4 py-3 rounded-lg border-2 cursor-pointer transition"
+                                    :class="ulasimTipi === 'yol_parasi_aylik' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'">
+                                    <input type="radio" v-model="ulasimTipi" value="yol_parasi_aylik" class="text-blue-600" />
+                                    <div>
+                                        <div class="text-sm font-bold">💵 Aylık Yol Parası</div>
+                                        <div class="text-[10px] text-gray-500">Aylık toplu ödenen yol parası atanır</div>
                                     </div>
                                 </label>
                             </div>
@@ -133,10 +143,15 @@ const submit = () => {
                                 <label class="text-xs font-semibold w-28">Servis Plakası:</label>
                                 <input v-model="form.servis_plaka" type="text" placeholder="34 ABC 123" class="border-gray-300 rounded-sm py-1.5 px-2 text-sm flex-1 max-w-xs" />
                             </div>
-                            <div v-if="ulasimTipi === 'yol_parasi'" class="flex items-center gap-3">
+                            <div v-if="ulasimTipi === 'yol_parasi_gunluk'" class="flex items-center gap-3">
                                 <label class="text-xs font-semibold w-28">Günlük Ücret:</label>
                                 <input v-model="form.yol_parasi" type="number" step="0.01" min="0" placeholder="75.00" class="border-gray-300 rounded-sm py-1.5 px-2 text-sm w-32 text-right" />
                                 <span class="text-xs text-gray-500">₺ / gün</span>
+                            </div>
+                            <div v-if="ulasimTipi === 'yol_parasi_aylik'" class="flex items-center gap-3">
+                                <label class="text-xs font-semibold w-28">Aylık Ücret:</label>
+                                <input v-model="form.yol_parasi" type="number" step="0.01" min="0" placeholder="1500.00" class="border-gray-300 rounded-sm py-1.5 px-2 text-sm w-32 text-right" />
+                                <span class="text-xs text-gray-500">₺ / ay</span>
                             </div>
                         </div>
                     </div>
@@ -147,9 +162,13 @@ const submit = () => {
                         <span class="ml-3 text-sm text-gray-600">Bilgilerinizi kontrol ettikten sonra işlemi başlatın.</span>
                         <div v-if="selectedIds.length > 0" class="mt-3 bg-gray-50 border rounded p-3 text-xs space-y-1">
                             <div><strong>Seçili personel:</strong> {{ selectedIds.length }} kişi</div>
-                            <div><strong>Ulaşım tipi:</strong> {{ ulasimTipi === 'servis' ? '🚌 Servis Hakkı' : '💵 Yol Parası' }}</div>
+                            <div><strong>Ulaşım tipi:</strong> 
+                                {{ ulasimTipi === 'servis' ? '🚌 Servis Hakkı' : 
+                                   ulasimTipi === 'yol_parasi_gunluk' ? '💵 Günlük Yol Parası' : '💵 Aylık Yol Parası' }}
+                            </div>
                             <div v-if="ulasimTipi === 'servis'"><strong>Plaka:</strong> {{ form.servis_plaka || '—' }}</div>
-                            <div v-if="ulasimTipi === 'yol_parasi'"><strong>Günlük Ücret:</strong> {{ form.yol_parasi || '—' }} ₺</div>
+                            <div v-if="ulasimTipi === 'yol_parasi_gunluk'"><strong>Günlük Ücret:</strong> {{ form.yol_parasi || '—' }} ₺</div>
+                            <div v-if="ulasimTipi === 'yol_parasi_aylik'"><strong>Aylık Ücret:</strong> {{ form.yol_parasi || '—' }} ₺</div>
                         </div>
                     </div>
                 </div>
