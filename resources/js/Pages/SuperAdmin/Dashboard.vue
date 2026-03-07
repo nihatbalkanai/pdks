@@ -607,6 +607,12 @@ const onTabChange = (tab) => {
                             <button v-if="can?.teknik_loglar_gorme" @click="onTabChange('teknik')" :class="activeTab === 'teknik' ? 'border-red-500 text-red-600' : 'border-transparent text-gray-500 hover:text-gray-700'" class="py-3 px-1 border-b-2 text-sm font-semibold transition">
                                 ⚡ Teknik Loglar
                             </button>
+                            <Link :href="route('super-admin.deployment')" class="py-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-violet-700 text-sm font-semibold transition">
+                                🚀 Deployment
+                            </Link>
+                            <Link :href="route('super-admin.database')" class="py-3 px-1 border-b-2 border-transparent text-gray-500 hover:text-emerald-700 text-sm font-semibold transition">
+                                🗄️ Database
+                            </Link>
                         </nav>
                     </div>
 

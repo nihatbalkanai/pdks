@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Personel;
 use App\Models\Firma;
+use App\Models\PdksKaydi;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -24,6 +26,7 @@ class MobilAppController extends Controller
             'cihaz_id' => 'nullable|string',
             'cihaz_adi' => 'nullable|string',
             'platform' => 'nullable|in:ios,android,web',
+            'push_token' => 'nullable|string',
         ]);
 
         // 1. Firmayı bul
@@ -44,7 +47,7 @@ class MobilAppController extends Controller
         if (!$personel) {
             return response()->json(['hata' => true, 'mesaj' => 'Bu TC numarası ile kayıtlı personel bulunamadı.'], 404);
         }
-        if ($personel->durum !== 'aktif') {
+        if ($personel->durum !== 'aktif' && $personel->durum != 1) {
             return response()->json(['hata' => true, 'mesaj' => 'Hesabınız aktif değil.'], 403);
         }
 
@@ -80,6 +83,7 @@ class MobilAppController extends Controller
                     'son_ip' => $request->ip(),
                     'aktif' => true,
                     'admin_onayli' => false,
+                    'push_token' => $request->push_token,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ]);
@@ -91,6 +95,7 @@ class MobilAppController extends Controller
                 DB::table('mobil_cihazlar')->where('id', $cihaz->id)->update([
                     'son_giris' => now(),
                     'son_ip' => $request->ip(),
+                    'push_token' => $request->push_token ?? $cihaz->push_token,
                     'updated_at' => now(),
                 ]);
             }
@@ -105,15 +110,16 @@ class MobilAppController extends Controller
             'token' => $token,
             'personel' => [
                 'id' => $personel->id,
-                'ad' => $personel->ad,
-                'soyad' => $personel->soyad,
+                'ad' => $personel->ad ?: (explode(' ', $personel->ad_soyad ?? '')[0] ?? ''),
+                'soyad' => $personel->soyad ?: (explode(' ', $personel->ad_soyad ?? '')[1] ?? ''),
                 'kart_no' => $personel->kart_no,
                 'departman' => $personel->departman,
-                'pozisyon' => $personel->gorev,
+                'pozisyon' => $personel->unvan,
             ],
             'firma' => [
                 'id' => $firma->id,
                 'firma_adi' => $firma->firma_adi,
+                'logo' => $firma->logo_yolu ? asset('storage/'.$firma->logo_yolu) : null,
                 'gps_zorunlu' => $firma->gps_zorunlu,
                 'qr_kod_aktif' => $firma->qr_kod_aktif,
                 'geofence_yaricap' => $firma->geofence_yaricap,
@@ -164,23 +170,46 @@ class MobilAppController extends Controller
             return response()->json(['hata' => true, 'mesaj' => 'Sahte konum algılandı! Bu işlem raporlanacaktır.'], 403);
         }
 
-        // GPS doğrulama
+        // GPS doğrulama (Şube bazlı çoklu konum desteği)
         if ($firma->gps_zorunlu && $yontem === 'gps') {
             if (!$request->enlem || !$request->boylam) {
                 return response()->json(['hata' => true, 'mesaj' => 'Konum bilgisi zorunludur.'], 422);
             }
 
+            // Öncelik sırası: 1) Personelin şubesi, 2) Firma merkez konumu
+            $hedefEnlem = null;
+            $hedefBoylam = null;
+            $hedefYaricap = $firma->geofence_yaricap ?? 200;
+            $lokasyonAdi = 'Firma Merkezi';
+
+            // Personelin şubesi varsa ve şubenin koordinatları tanımlıysa
+            if ($personel->sube_id) {
+                $sube = \App\Models\Sube::find($personel->sube_id);
+                if ($sube && $sube->lokasyon_enlem && $sube->lokasyon_boylam) {
+                    $hedefEnlem = $sube->lokasyon_enlem;
+                    $hedefBoylam = $sube->lokasyon_boylam;
+                    $hedefYaricap = $sube->geofence_yaricap ?? $hedefYaricap;
+                    $lokasyonAdi = $sube->sube_adi;
+                }
+            }
+
+            // Şube yoksa veya şubenin koordinatları tanımlı değilse firma merkezini kullan
+            if (!$hedefEnlem && $firma->lokasyon_enlem && $firma->lokasyon_boylam) {
+                $hedefEnlem = $firma->lokasyon_enlem;
+                $hedefBoylam = $firma->lokasyon_boylam;
+            }
+
             // Mesafe hesapla (Haversine formülü)
-            if ($firma->lokasyon_enlem && $firma->lokasyon_boylam) {
+            if ($hedefEnlem && $hedefBoylam) {
                 $mesafe = $this->mesafeHesapla(
                     $request->enlem, $request->boylam,
-                    $firma->lokasyon_enlem, $firma->lokasyon_boylam
+                    $hedefEnlem, $hedefBoylam
                 );
 
-                if ($mesafe > $firma->geofence_yaricap) {
+                if ($mesafe > $hedefYaricap) {
                     return response()->json([
                         'hata' => true,
-                        'mesaj' => "Çalışma alanı dışındasınız. Mesafe: {$mesafe}m (İzin verilen: {$firma->geofence_yaricap}m)",
+                        'mesaj' => "{$lokasyonAdi} çalışma alanı dışındasınız. Mesafe: {$mesafe}m (İzin verilen: {$hedefYaricap}m)",
                         'mesafe' => $mesafe,
                     ], 403);
                 }
@@ -224,12 +253,55 @@ class MobilAppController extends Controller
             'updated_at' => now(),
         ]);
 
-        $tipLabel = $request->tip === 'giris' ? 'Giriş' : 'Çıkış';
+        // Ana sisteme (Puantaj Hesaplamalarına / Personel Kartlarına) eş zamanlı olarak PDKS kaydı düşürüyoruz
+        PdksKaydi::create([
+            'firma_id' => $firma->id,
+            'personel_id' => $personel->id,
+            'kayit_tarihi' => now(),
+            'islem_tipi' => $request->tip === 'giris' ? 'Giriş' : 'Çıkış',
+            'ham_veri' => [
+                'kaynak' => 'Mobil Uygulama',
+                'yontem' => $yontem,
+                'cihaz' => 'Mobil'
+            ]
+        ]);
+
+        // Günün saatine göre ve doğum gününe göre mesaj oluşturma
+        $saat = (int) now()->format('H');
+        $mesajPrefix = '';
+        
+        $bugunDogumGunu = false;
+        if ($personel->dogum_tarihi) {
+            $bugunDogumGunu = now()->format('m-d') === \Carbon\Carbon::parse($personel->dogum_tarihi)->format('m-d');
+        }
+
+        if ($request->tip === 'giris') {
+            if ($saat >= 5 && $saat < 12) {
+                $mesajPrefix = 'Günaydın, hoş geldiniz! ';
+            } elseif ($saat >= 12 && $saat < 18) {
+                $mesajPrefix = 'İyi günler, iyi çalışmalar! ';
+            } else {
+                $mesajPrefix = 'İyi akşamlar, iyi çalışmalar! ';
+            }
+        } else {
+            if ($saat >= 16) {
+                $mesajPrefix = 'Mesainiz bitti, iyi akşamlar! Emeğinize sağlık. ';
+            } else {
+                $mesajPrefix = 'İyi günler dileriz! ';
+            }
+        }
+
+        $tamMesaj = $mesajPrefix . " İşlem başarıyla kaydedildi.";
+        if ($bugunDogumGunu && $request->tip === 'giris') {
+            $tamMesaj = "🎉 Doğum gününüz kutlu olsun! " . $tamMesaj;
+        }
+
         return response()->json([
             'hata' => false,
-            'mesaj' => "{$tipLabel} başarıyla kaydedildi.",
+            'mesaj' => $tamMesaj,
             'zaman' => now()->format('H:i:s'),
             'mesafe' => $mesafe,
+            'dogum_gunu_mu' => $bugunDogumGunu,
         ]);
     }
 

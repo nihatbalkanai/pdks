@@ -32,7 +32,10 @@ class FeatureGate
 
         $sahipMi = false;
         
-        if ($paket && is_array($paket->ozellikler)) {
+        // Paket atanmamışsa tüm özellikler açık (demo/geliştirme)
+        if (!$paket) {
+            $sahipMi = true;
+        } elseif (is_array($paket->ozellikler)) {
             if (in_array($ozellik, $paket->ozellikler)) {
                 $sahipMi = true;
             }

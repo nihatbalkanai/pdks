@@ -18,6 +18,7 @@ const form = reactive({
     qr_kod_aktif: !!props.firma?.qr_kod_aktif,
     gps_zorunlu: props.firma?.gps_zorunlu !== false,
     selfie_zorunlu: !!props.firma?.selfie_zorunlu,
+    logo: null,
 });
 
 const qrForm = reactive({ konum_adi: 'Ana Giriş', gecerlilik_dakika: 480 });
@@ -25,8 +26,13 @@ const yeniQrKod = ref('');
 
 const kaydet = () => {
     router.post(route('baglanti.mobil.ayarlar'), { ...form }, {
+        forceFormData: true,
         onSuccess: () => Swal.fire('Başarılı', 'Ayarlar kaydedildi.', 'success'),
     });
+};
+
+const fileChanged = (e) => {
+    form.logo = e.target.files[0];
 };
 
 const cihazDurumDegistir = async (id, aktif) => {
@@ -75,6 +81,18 @@ const yontemLabel = { gps: '📍 GPS', qr: '📸 QR Kod', wifi: '📶 WiFi', bea
                         <div class="flex items-center gap-3">
                             <input v-model="form.firma_kodu" type="text" class="border-gray-300 rounded text-lg font-black tracking-widest uppercase w-48 text-center" maxlength="20" />
                             <span class="bg-violet-200 text-violet-700 px-3 py-1 rounded text-xs font-bold">Personele verin</span>
+                        </div>
+                    </div>
+
+                    <!-- Firma Logo -->
+                    <div class="bg-gray-50 border border-gray-200 rounded-xl p-5 flex items-center gap-4">
+                        <div v-if="firma?.logo_yolu" class="w-16 h-16 rounded overflow-hidden shadow-sm bg-white flex-shrink-0">
+                            <img :src="`/storage/${firma.logo_yolu}`" alt="Firma Logo" class="w-full h-full object-contain" />
+                        </div>
+                        <div v-else class="w-16 h-16 rounded shadow-sm bg-gray-200 flex-shrink-0 flex items-center justify-center text-xl">🏢</div>
+                        <div class="flex-1">
+                            <h3 class="text-sm font-bold text-gray-700 mb-1">Firma Logosu (Uygulama İçi)</h3>
+                            <input type="file" @change="fileChanged" accept="image/*" class="w-full text-xs text-gray-500 file:mr-3 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-violet-100 file:text-violet-700 hover:file:bg-violet-200 cursor-pointer" />
                         </div>
                     </div>
 

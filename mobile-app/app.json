@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "PDKSPro",
+    "slug": "pdkspro",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6C3CE1"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pdkspro.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Giriş/çıkış kaydı için konumunuza ihtiyaç duyulur.",
+        "NSCameraUsageDescription": "QR kod taramak için kameraya erişim gereklidir."
+      }
+    },
+    "android": {
+      "package": "com.pdkspro.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#6C3CE1",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-location",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "QR kod taramak için kameraya erişim gereklidir."
+        }
+      ]
+    ]
+  }
+}

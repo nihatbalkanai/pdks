@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use App\Models\Firma;
@@ -62,9 +63,19 @@ class MobilBaglantiController extends Controller
             'qr_kod_aktif' => 'boolean',
             'gps_zorunlu' => 'boolean',
             'selfie_zorunlu' => 'boolean',
+            'logo' => 'nullable|image|mimes:jpeg,png,jpg,gif,webp|max:2048',
         ]);
 
         $firma = Firma::find(Auth::user()->firma_id);
+
+        if ($request->hasFile('logo')) {
+            if ($firma->logo_yolu && Storage::disk('public')->exists($firma->logo_yolu)) {
+                Storage::disk('public')->delete($firma->logo_yolu);
+            }
+            $v['logo_yolu'] = $request->file('logo')->store('firmalar/logolar', 'public');
+        }
+
+        unset($v['logo']); // We only store logo_yolu in DB, remove the file obj from array
         $firma->update($v);
 
         return back()->with('success', 'Mobil bağlantı ayarları güncellendi.');

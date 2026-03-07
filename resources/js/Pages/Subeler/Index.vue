@@ -4,6 +4,7 @@ import { Head, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { ref, reactive } from 'vue';
 import Modal from '@/Components/Modal.vue';
+import Swal from 'sweetalert2';
 
 const props = defineProps({
     subeler: Object
@@ -15,6 +16,9 @@ const editingSube = ref(null);
 const form = reactive({
     sube_adi: '',
     lokasyon: '',
+    lokasyon_enlem: null,
+    lokasyon_boylam: null,
+    geofence_yaricap: 200,
     durum: true
 });
 
@@ -23,9 +27,16 @@ const openModal = (sube = null) => {
     if(sube) {
         form.sube_adi = sube.sube_adi;
         form.lokasyon = sube.lokasyon;
+        form.lokasyon_enlem = sube.lokasyon_enlem;
+        form.lokasyon_boylam = sube.lokasyon_boylam;
+        form.geofence_yaricap = sube.geofence_yaricap || 200;
         form.durum = !!sube.durum;
     } else {
-        // form reset (reactive)
+        form.sube_adi = '';
+        form.lokasyon = '';
+        form.lokasyon_enlem = null;
+        form.lokasyon_boylam = null;
+        form.geofence_yaricap = 200;
         form.durum = true;
     }
     isModalOpen.value = true;
@@ -36,13 +47,23 @@ const closeModal = () => {
     // form reset (reactive)
 };
 
-const saveSube = () => {
-    if(editingSube.value) {
-        form.put(route('subeler.update', editingSube.value.id), {
-            onSuccess: () => closeModal()
-        });
-    } else {
-        axios.post(route('subeler.store'), { ...form }).catch(e => Swal.fire('Hata', e.response?.data?.message || 'Hata oluştu', 'error'));
+const saveSube = async () => {
+    try {
+        if(editingSube.value) {
+            await axios.put(route('subeler.update', editingSube.value.id), { ...form });
+        } else {
+            await axios.post(route('subeler.store'), { ...form });
+        }
+        closeModal();
+        Swal.fire({ title: 'Başarılı!', text: 'Şube başarıyla kaydedildi.', icon: 'success', timer: 1500 });
+        setTimeout(() => window.location.reload(), 1500);
+    } catch(e) {
+        let msg = e.response?.data?.message || 'Bir hata oluştu.';
+        if (e.response?.data?.errors) {
+            msg += '\n' + Object.values(e.response.data.errors).flat().join('\n');
+        }
+        console.error('Şube kaydetme hatası:', e.response?.data);
+        Swal.fire('Hata', msg, 'error');
     }
 };
 
@@ -77,6 +98,7 @@ const deleteSube = (id) => {
                                 <tr>
                                     <th class="py-3 px-6 text-left">Şube Adı</th>
                                     <th class="py-3 px-6 text-left">Lokasyon</th>
+                                    <th class="py-3 px-6 text-center">GPS Konum</th>
                                     <th class="py-3 px-6 text-center">Bağlı Personel</th>
                                     <th class="py-3 px-6 text-center">Bağlı Cihaz</th>
                                     <th class="py-3 px-6 text-center">Durum</th>
@@ -87,6 +109,10 @@ const deleteSube = (id) => {
                                 <tr v-for="sube in subeler.data" :key="sube.id" class="border-b border-gray-200 hover:bg-gray-100 transition">
                                     <td class="py-3 px-6 text-left font-medium">{{ sube.sube_adi }}</td>
                                     <td class="py-3 px-6 text-left">{{ sube.lokasyon || '-' }}</td>
+                                    <td class="py-3 px-6 text-center">
+                                        <span v-if="sube.lokasyon_enlem && sube.lokasyon_boylam" class="bg-green-100 text-green-800 py-1 px-2 rounded-full text-xs font-bold" :title="sube.lokasyon_enlem + ', ' + sube.lokasyon_boylam">📍 Tanımlı ({{ sube.geofence_yaricap }}m)</span>
+                                        <span v-else class="bg-gray-100 text-gray-500 py-1 px-2 rounded-full text-xs">— Yok</span>
+                                    </td>
                                     <td class="py-3 px-6 text-center">
                                         <span class="bg-blue-100 text-blue-800 py-1 px-3 rounded-full text-xs font-bold">{{ sube.personeller_count }}</span>
                                     </td>
@@ -103,7 +129,7 @@ const deleteSube = (id) => {
                                     </td>
                                 </tr>
                                 <tr v-if="subeler.data.length === 0">
-                                    <td colspan="6" class="py-4 text-center text-gray-500">Henüz kaydedilmiş bir şube bulunmuyor.</td>
+                                    <td colspan="7" class="py-4 text-center text-gray-500">Henüz kaydedilmiş bir şube bulunmuyor.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -124,8 +150,26 @@ const deleteSube = (id) => {
                             <input v-model="form.sube_adi" type="text" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" required>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700">Lokasyon (Opsiyonel)</label>
-                            <input v-model="form.lokasyon" type="text" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                            <label class="block text-sm font-medium text-gray-700">Lokasyon (Adres - Opsiyonel)</label>
+                            <input v-model="form.lokasyon" type="text" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="örn: Kadıköy, İstanbul">
+                        </div>
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <h4 class="text-sm font-bold text-blue-700 mb-3">📍 GPS Konum Ayarları (Mobil Giriş Kontrolü)</h4>
+                            <p class="text-xs text-gray-500 mb-3">Koordinatları Google Maps'ten alabilirsiniz: Haritaya sağ tıklayın → Koordinatları kopyalayın</p>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600">Enlem (Latitude)</label>
+                                    <input v-model="form.lokasyon_enlem" type="number" step="0.0000001" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="41.0082">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600">Boylam (Longitude)</label>
+                                    <input v-model="form.lokasyon_boylam" type="number" step="0.0000001" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="28.9784">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-600">Yarıçap (metre)</label>
+                                    <input v-model="form.geofence_yaricap" type="number" min="10" max="5000" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="200">
+                                </div>
+                            </div>
                         </div>
                         <div v-if="editingSube" class="flex items-center">
                             <input type="checkbox" v-model="form.durum" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />

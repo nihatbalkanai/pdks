@@ -26,6 +26,11 @@ class PdksKaydi extends Model
         'ham_veri',
     ];
 
+    protected $casts = [
+        'ham_veri' => 'array',
+        'kayit_tarihi' => 'datetime',
+    ];
+
     public function personel()
     {
         return $this->belongsTo(Personel::class, 'personel_id');

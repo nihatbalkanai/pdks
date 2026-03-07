@@ -25,6 +25,12 @@ class SubeController extends Controller
         $validated = $request->validate([
             'sube_adi' => 'required|string|max:255',
             'lokasyon' => 'nullable|string|max:255',
+            'lokasyon_enlem' => 'nullable|numeric|between:-90,90',
+            'lokasyon_boylam' => 'nullable|numeric|between:-180,180',
+            'geofence_yaricap' => 'nullable|integer|min:10|max:5000',
+        ], [
+            'lokasyon_enlem.between' => 'Enlem -90 ile 90 arasında olmalıdır. Google Maps\'ten koordinat kopyalayın.',
+            'lokasyon_boylam.between' => 'Boylam -180 ile 180 arasında olmalıdır. Google Maps\'ten koordinat kopyalayın.',
         ]);
 
         $validated['firma_id'] = \Illuminate\Support\Facades\Auth::user()->firma_id;
@@ -41,7 +47,13 @@ class SubeController extends Controller
         $validated = $request->validate([
             'sube_adi' => 'required|string|max:255',
             'lokasyon' => 'nullable|string|max:255',
+            'lokasyon_enlem' => 'nullable|numeric|between:-90,90',
+            'lokasyon_boylam' => 'nullable|numeric|between:-180,180',
+            'geofence_yaricap' => 'nullable|integer|min:10|max:5000',
             'durum' => 'required|boolean'
+        ], [
+            'lokasyon_enlem.between' => 'Enlem -90 ile 90 arasında olmalıdır. Google Maps\'ten koordinat kopyalayın.',
+            'lokasyon_boylam.between' => 'Boylam -180 ile 180 arasında olmalıdır. Google Maps\'ten koordinat kopyalayın.',
         ]);
 
         $sube->update($validated);

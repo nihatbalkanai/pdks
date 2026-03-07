@@ -44,7 +44,7 @@ const hasFeature = (ozellik) => {
     const firma = page.props.auth?.firma;
     if (!firma) return true;
     const paket = firma?.paket;
-    if (!paket) return false;
+    if (!paket) return true; // Paket atanmamışsa tüm özellikler açık (demo/geliştirme)
     if (paket.paket_adi === 'Enterprise') return true;
     return Array.isArray(paket.ozellikler) && paket.ozellikler.includes(ozellik);
 };
@@ -429,6 +429,10 @@ onUnmounted(() => {
                         <Link :href="route('tanim.kodlar', 'sirket')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/kodlar/sirket')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
                             Şirket Tanımlama
+                        </Link>
+                        <Link v-if="hasFeature('şube_yönetimi')" :href="route('subeler.index')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/subeler')}">
+                            <svg class="w-3.5 h-3.5 mr-1.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            Şube Tanımlama
                         </Link>
                         <Link :href="route('tanim.kodlar', 'departman')" class="sidebar-item" :class="{'sidebar-item-active': $page.url.includes('/kodlar/departman')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>

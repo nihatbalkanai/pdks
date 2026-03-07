@@ -258,6 +258,24 @@ Route::middleware(['auth', 'superadmin'])->prefix('super-admin')->name('super-ad
     Route::get('/destek-biletleri/{id}', [\App\Http\Controllers\DestekBiletController::class, 'detay'])->name('destek.detay');
     Route::post('/destek-biletleri/{id}/mesaj', [\App\Http\Controllers\DestekBiletController::class, 'mesajGonder'])->name('destek.mesaj');
     Route::put('/destek-biletleri/{id}/durum', [\App\Http\Controllers\DestekBiletController::class, 'durumGuncelle'])->name('destek.durum');
+
+    // Deployment (Sunucu Dosya Yönetimi)
+    Route::get('/deployment', [\App\Http\Controllers\DeploymentController::class, 'index'])->name('deployment');
+    Route::get('/deployment/dosyalar', [\App\Http\Controllers\DeploymentController::class, 'degisenDosyalar'])->name('deployment.dosyalar');
+    Route::post('/deployment/yukle', [\App\Http\Controllers\DeploymentController::class, 'yukle'])->name('deployment.yukle');
+    Route::post('/deployment/test', [\App\Http\Controllers\DeploymentController::class, 'baglantiTest'])->name('deployment.test');
+
+    // Veritabanı Yönetimi
+    Route::get('/database', [\App\Http\Controllers\DatabaseYonetimController::class, 'index'])->name('database');
+    Route::post('/database/tablolar', [\App\Http\Controllers\DatabaseYonetimController::class, 'tablolar'])->name('database.tablolar');
+    Route::post('/database/tablo-yapisi', [\App\Http\Controllers\DatabaseYonetimController::class, 'tabloYapisi'])->name('database.tablo-yapisi');
+    Route::post('/database/tablo-verileri', [\App\Http\Controllers\DatabaseYonetimController::class, 'tabloVerileri'])->name('database.tablo-verileri');
+    Route::post('/database/sorgu', [\App\Http\Controllers\DatabaseYonetimController::class, 'sorguCalistir'])->name('database.sorgu');
+    Route::post('/database/tablo-olustur', [\App\Http\Controllers\DatabaseYonetimController::class, 'tabloOlustur'])->name('database.tablo-olustur');
+    Route::post('/database/kolon-ekle', [\App\Http\Controllers\DatabaseYonetimController::class, 'kolonEkle'])->name('database.kolon-ekle');
+    Route::post('/database/kolon-sil', [\App\Http\Controllers\DatabaseYonetimController::class, 'kolonSil'])->name('database.kolon-sil');
+    Route::post('/database/tablo-temizle', [\App\Http\Controllers\DatabaseYonetimController::class, 'tabloTemizle'])->name('database.tablo-temizle');
+    Route::post('/database/baglanti-test', [\App\Http\Controllers\DatabaseYonetimController::class, 'baglantiTest'])->name('database.baglanti-test');
 });
 
 // Destek Biletleri (Firma kullanıcı tarafı)

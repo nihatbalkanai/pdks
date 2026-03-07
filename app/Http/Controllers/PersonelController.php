@@ -51,12 +51,20 @@ class PersonelController extends Controller
             ->orderBy('ad')
             ->get();
 
+        // Şube listesi (aktif şubeler)
+        $subeler = \App\Models\Sube::withoutGlobalScopes()
+            ->where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->orderBy('sube_adi')
+            ->get(['id', 'sube_adi', 'lokasyon_enlem', 'lokasyon_boylam']);
+
         return Inertia::render('Personel/Index', [
             'personeller' => $personeller,
             'filtreler' => $request->only(['arama']),
             'tanimKodlari' => $tanimKodlari,
             'aylikPuantajParametreleri' => $aylikPuantajParametreleri,
             'gunlukPuantajParametreleri' => $gunlukPuantajParametreleri,
+            'subeler' => $subeler,
         ]);
     }
 
@@ -72,6 +80,7 @@ class PersonelController extends Controller
             'unvan' => 'nullable|string|max:100',
             'sirket' => 'nullable|string|max:255',
             'bolum' => 'nullable|string|max:255',
+            'sube_id' => 'nullable|integer|exists:subeler,id',
             'ozel_kod' => 'nullable|string|max:100',
             'departman' => 'nullable|string|max:255',
             'servis_kodu' => 'nullable|string|max:255',
@@ -295,6 +304,7 @@ class PersonelController extends Controller
             'unvan' => 'nullable|string|max:100',
             'sirket' => 'nullable|string|max:255',
             'bolum' => 'nullable|string|max:255',
+            'sube_id' => 'nullable|integer|exists:subeler,id',
             'ozel_kod' => 'nullable|string|max:100',
             'departman' => 'nullable|string|max:255',
             'servis_kodu' => 'nullable|string|max:255',

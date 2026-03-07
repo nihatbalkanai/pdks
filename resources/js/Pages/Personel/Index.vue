@@ -11,6 +11,7 @@ const props = defineProps({
     tanimKodlari: Object,
     aylikPuantajParametreleri: { type: Array, default: () => [] },
     gunlukPuantajParametreleri: { type: Array, default: () => [] },
+    subeler: { type: Array, default: () => [] },
 });
 
 // Tanım kodları helper
@@ -118,6 +119,7 @@ const savePersonel = async () => {
             sirket: selectedPersonel.value.sirket || '',
             bolum: selectedPersonel.value.bolum || '',
             ozel_kod: selectedPersonel.value.ozel_kod || '',
+            sube_id: selectedPersonel.value.sube_id || null,
             departman: selectedPersonel.value.departman || '',
             servis_kodu: selectedPersonel.value.servis_kodu || '',
             hesap_gurubu: selectedPersonel.value.hesap_gurubu || '',
@@ -469,6 +471,34 @@ const tarihAralikIcinde = (tarihStr) => {
 const filtreliPdksKayitlari = computed(() => {
     return (selectedPersonel.value.pdks_kayitlari || []).filter(k => tarihAralikIcinde(k.kayit_tarihi));
 });
+
+// Giriş-Çıkış kayıtlarını aynı gündeki çiftler halinde birleştir
+const grupluGirisCikis = computed(() => {
+    const kayitlar = filtreliPdksKayitlari.value;
+    const gunMap = {};
+    for (const k of kayitlar) {
+        if (!k.kayit_tarihi) continue;
+        const tarih = k.kayit_tarihi.substring(0, 10);
+        if (!gunMap[tarih]) gunMap[tarih] = { tarih, girisler: [], cikislar: [], kaynak: null };
+        const tip = String(k.islem_tipi ?? '').toLowerCase();
+        const isGiris = tip === 'giriş' || tip === 'giris' || tip === '1';
+        const isCikis = tip === 'çıkış' || tip === 'cikis' || tip === '0';
+        const saat = k.kayit_tarihi.substring(11, 16);
+        const hamVeri = typeof k.ham_veri === 'string' ? JSON.parse(k.ham_veri || '{}') : (k.ham_veri || {});
+        const kaynak = hamVeri.kaynak || (hamVeri.toplu ? 'Toplu İşlem' : 'Cihaz');
+        if (isGiris) gunMap[tarih].girisler.push(saat);
+        else if (isCikis) gunMap[tarih].cikislar.push(saat);
+        if (!gunMap[tarih].kaynak) gunMap[tarih].kaynak = kaynak;
+        // İzin mi?
+        if (k.izinli_mi) gunMap[tarih].izinli_mi = true;
+        if (k.izin_aciklama) gunMap[tarih].izin_aciklama = k.izin_aciklama;
+    }
+    return Object.values(gunMap).map(g => {
+        g.girisler.sort();
+        g.cikislar.sort();
+        return g;
+    }).sort((a, b) => b.tarih.localeCompare(a.tarih));
+});
 const filtreliMesailer = computed(() => {
     return (selectedPersonel.value.mesailer || []).filter(m => tarihAralikIcinde(m.tarih));
 });
@@ -717,6 +747,13 @@ const uploadResim = async (event) => {
                                                     </select>
                                                 </div>
                                                 <div class="form-group">
+                                                    <label>Şube</label>
+                                                    <select v-model="selectedPersonel.sube_id" class="form-input">
+                                                        <option :value="null">Seçiniz</option>
+                                                        <option v-for="s in subeler" :key="s.id" :value="s.id">{{ s.sube_adi }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
                                                     <label>Bölüm</label>
                                                     <select v-model="selectedPersonel.bolum" class="form-input">
                                                         <option value="">Seçiniz</option>
@@ -900,24 +937,33 @@ const uploadResim = async (event) => {
                             <div v-else-if="activeTab === 'giris_cikis'">
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>Tarih</th><th>Saat</th><th>İşlem</th><th>Durum</th>
+                                        <th>Tarih</th><th>Giriş Saati</th><th>Çıkış Saati</th><th>Kaynak</th><th>Durum</th>
                                     </tr></thead>
                                     <tbody>
-                                        <tr v-for="k in filtreliPdksKayitlari" :key="k.id"
-                                            :class="{'!bg-amber-50': k.izinli_mi}">
-                                            <td>{{ formatTarih(k.kayit_tarihi) }}</td>
-                                            <td>{{ k.izinli_mi ? '' : (k.kayit_tarihi ? k.kayit_tarihi.substring(11,16) : '') }}</td>
+                                        <tr v-for="g in grupluGirisCikis" :key="g.tarih"
+                                            :class="{'!bg-amber-50': g.izinli_mi}">
+                                            <td>{{ formatTarih(g.tarih) }}</td>
                                             <td>
-                                                <span v-if="!k.izinli_mi" :class="k.islem_tipi === 'Giriş' ? 'text-green-600' : 'text-red-600'" class="font-semibold">{{ k.islem_tipi }}</span>
+                                                <span v-if="g.girisler.length" class="text-green-600 font-semibold">{{ g.girisler.join(' / ') }}</span>
+                                                <span v-else class="text-gray-300">—</span>
                                             </td>
                                             <td>
-                                                <span v-if="k.izinli_mi" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-300">
-                                                    ⚠ İZİNLİ <span v-if="k.izin_aciklama" class="font-normal">({{ k.izin_aciklama }})</span>
+                                                <span v-if="g.cikislar.length" class="text-red-600 font-semibold">{{ g.cikislar.join(' / ') }}</span>
+                                                <span v-else class="text-gray-300">—</span>
+                                            </td>
+                                            <td>
+                                                <span v-if="g.kaynak === 'Mobil Uygulama' || g.kaynak === 'Mobil Gecmis'" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">📱 Mobil</span>
+                                                <span v-else-if="g.kaynak === 'Toplu İşlem'" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">📋 Toplu</span>
+                                                <span v-else class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">🖥 Cihaz</span>
+                                            </td>
+                                            <td>
+                                                <span v-if="g.izinli_mi" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-700 border border-orange-300">
+                                                    ⚠ İZİNLİ <span v-if="g.izin_aciklama" class="font-normal">({{ g.izin_aciklama }})</span>
                                                 </span>
                                                 <span v-else class="text-green-600">Başarılı</span>
                                             </td>
                                         </tr>
-                                        <tr v-if="!filtreliPdksKayitlari.length"><td colspan="4" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
+                                        <tr v-if="!grupluGirisCikis.length"><td colspan="5" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
                                     </tbody>
                                 </table>
                             </div>
