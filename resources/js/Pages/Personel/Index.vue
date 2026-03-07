@@ -12,6 +12,7 @@ const props = defineProps({
     aylikPuantajParametreleri: { type: Array, default: () => [] },
     gunlukPuantajParametreleri: { type: Array, default: () => [] },
     subeler: { type: Array, default: () => [] },
+    vardiyalar: { type: Array, default: () => [] },
 });
 
 // Tanım kodları helper
@@ -140,6 +141,7 @@ const savePersonel = async () => {
             dogum_tarihi: selectedPersonel.value.dogum_tarihi || null,
             puantaj_parametre_id: selectedPersonel.value.puantaj_parametre_id || null,
             aylik_puantaj_parametre_id: selectedPersonel.value.aylik_puantaj_parametre_id || null,
+            vardiya_id: selectedPersonel.value.vardiya_id || null,
             tc_no: selectedPersonel.value.tc_no || null,
             iban_no: selectedPersonel.value.iban_no || null,
             adres: selectedPersonel.value.adres || null,
@@ -479,7 +481,7 @@ const grupluGirisCikis = computed(() => {
     for (const k of kayitlar) {
         if (!k.kayit_tarihi) continue;
         const tarih = k.kayit_tarihi.substring(0, 10);
-        if (!gunMap[tarih]) gunMap[tarih] = { tarih, girisler: [], cikislar: [], kaynak: null };
+        if (!gunMap[tarih]) gunMap[tarih] = { tarih, girisler: [], cikislar: [], kaynak: null, kayitIds: [] };
         const tip = String(k.islem_tipi ?? '').toLowerCase();
         const isGiris = tip === 'giriş' || tip === 'giris' || tip === '1';
         const isCikis = tip === 'çıkış' || tip === 'cikis' || tip === '0';
@@ -489,7 +491,7 @@ const grupluGirisCikis = computed(() => {
         if (isGiris) gunMap[tarih].girisler.push(saat);
         else if (isCikis) gunMap[tarih].cikislar.push(saat);
         if (!gunMap[tarih].kaynak) gunMap[tarih].kaynak = kaynak;
-        // İzin mi?
+        gunMap[tarih].kayitIds.push({ id: k.id, saat, tip: k.islem_tipi, tarih: k.kayit_tarihi });
         if (k.izinli_mi) gunMap[tarih].izinli_mi = true;
         if (k.izin_aciklama) gunMap[tarih].izin_aciklama = k.izin_aciklama;
     }
@@ -499,6 +501,85 @@ const grupluGirisCikis = computed(() => {
         return g;
     }).sort((a, b) => b.tarih.localeCompare(a.tarih));
 });
+
+// Manuel PDKS Ekleme
+const manuelPdks = ref({ tarih: new Date().toISOString().slice(0,10), saat: '', islem_tipi: 'Giriş' });
+
+const manuelPdksEkle = async () => {
+    if (!manuelPdks.value.saat) { Swal.fire('Uyarı', 'Saat giriniz.', 'warning'); return; }
+    if (!selectedPersonel.value?.id) return;
+    try {
+        await axios.post(`/personeller/${selectedPersonel.value.id}/pdks`, manuelPdks.value);
+        Swal.fire({ icon: 'success', title: 'Kayıt eklendi!', timer: 1500, showConfirmButton: false });
+        manuelPdks.value.saat = '';
+        // Personeli yeniden yükle
+        const res = await axios.get(`/personeller/${selectedPersonel.value.id}`);
+        selectedPersonel.value = res.data;
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Kayıt eklenemedi.', 'error');
+    }
+};
+
+// PDKS Düzenleme Modal
+const pdksDuzenleModal = ref(false);
+const pdksDuzenleGun = ref(null);
+const pdksDuzenleKayitlar = ref([]);
+
+const pdksGunuDuzenle = (gun) => {
+    pdksDuzenleGun.value = gun;
+    pdksDuzenleKayitlar.value = (gun.kayitIds || []).map(k => ({
+        ...k,
+        editSaat: k.saat,
+        editTip: k.tip,
+        editTarih: k.tarih?.substring(0, 10) || gun.tarih,
+    }));
+    pdksDuzenleModal.value = true;
+};
+
+const pdksKayitGuncelle = async (k) => {
+    try {
+        await axios.put(`/personeller/${selectedPersonel.value.id}/pdks/${k.id}`, {
+            tarih: k.editTarih,
+            saat: k.editSaat,
+            islem_tipi: k.editTip,
+        });
+        Swal.fire({ icon: 'success', title: 'Güncellendi!', timer: 1200, showConfirmButton: false });
+        pdksDuzenleModal.value = false;
+        const res = await axios.get(`/personeller/${selectedPersonel.value.id}`);
+        selectedPersonel.value = res.data;
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Güncellenemedi.', 'error');
+    }
+};
+
+const pdksKayitSil = async (k) => {
+    const result = await Swal.fire({ title: 'Emin misiniz?', text: `${k.editTarih} ${k.editSaat} ${k.editTip} kaydı silinecek.`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Sil', cancelButtonText: 'İptal' });
+    if (!result.isConfirmed) return;
+    try {
+        await axios.delete(`/personeller/${selectedPersonel.value.id}/pdks/${k.id}`);
+        Swal.fire({ icon: 'success', title: 'Silindi!', timer: 1200, showConfirmButton: false });
+        pdksDuzenleModal.value = false;
+        const res = await axios.get(`/personeller/${selectedPersonel.value.id}`);
+        selectedPersonel.value = res.data;
+    } catch (e) {
+        Swal.fire('Hata', e.response?.data?.message || 'Silinemedi.', 'error');
+    }
+};
+
+const pdksGunuSil = async (gun) => {
+    const result = await Swal.fire({ title: 'Tüm günü silmek istiyor musunuz?', text: `${gun.tarih} tarihindeki ${gun.kayitIds.length} kayıt silinecek.`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Hepsini Sil', cancelButtonText: 'İptal' });
+    if (!result.isConfirmed) return;
+    try {
+        for (const k of gun.kayitIds) {
+            await axios.delete(`/personeller/${selectedPersonel.value.id}/pdks/${k.id}`);
+        }
+        Swal.fire({ icon: 'success', title: 'Tüm kayıtlar silindi!', timer: 1200, showConfirmButton: false });
+        const res = await axios.get(`/personeller/${selectedPersonel.value.id}`);
+        selectedPersonel.value = res.data;
+    } catch (e) {
+        Swal.fire('Hata', 'Silme işlemi başarısız.', 'error');
+    }
+};
 const filtreliMesailer = computed(() => {
     return (selectedPersonel.value.mesailer || []).filter(m => tarihAralikIcinde(m.tarih));
 });
@@ -761,6 +842,13 @@ const uploadResim = async (event) => {
                                                     </select>
                                                 </div>
                                                 <div class="form-group">
+                                                    <label>Vardiya</label>
+                                                    <select v-model="selectedPersonel.vardiya_id" class="form-input">
+                                                        <option :value="null">Seçiniz</option>
+                                                        <option v-for="v in props.vardiyalar" :key="v.id" :value="v.id">{{ v.ad }} ({{ v.baslangic_saati?.substring(0,5) }}-{{ v.bitis_saati?.substring(0,5) }})</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
                                                     <label>Özel Kod</label>
                                                     <select v-model="selectedPersonel.ozel_kod" class="form-input">
                                                         <option value="">Seçiniz</option>
@@ -935,9 +1023,25 @@ const uploadResim = async (event) => {
 
                             <!-- GİRİŞ-ÇIKIŞ -->
                             <div v-else-if="activeTab === 'giris_cikis'">
+                                <!-- Manuel Giriş/Çıkış Ekleme Formu -->
+                                <div class="mb-2 p-2 bg-blue-50 border border-blue-200 rounded">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-[10px] font-bold text-blue-700">✏️ Manuel Kayıt:</span>
+                                        <input v-model="manuelPdks.tarih" type="date" class="text-[10px] border border-gray-300 rounded px-1.5 py-0.5" />
+                                        <input v-model="manuelPdks.saat" type="time" class="text-[10px] border border-gray-300 rounded px-1.5 py-0.5" />
+                                        <select v-model="manuelPdks.islem_tipi" class="text-[10px] border border-gray-300 rounded px-1.5 py-0.5">
+                                            <option value="Giriş">Giriş</option>
+                                            <option value="Çıkış">Çıkış</option>
+                                        </select>
+                                        <button @click="manuelPdksEkle" class="px-2 py-0.5 text-[10px] bg-blue-600 text-white rounded hover:bg-blue-700 transition font-bold">
+                                            ➕ Ekle
+                                        </button>
+                                    </div>
+                                </div>
+
                                 <table class="data-table">
                                     <thead><tr>
-                                        <th>Tarih</th><th>Giriş Saati</th><th>Çıkış Saati</th><th>Kaynak</th><th>Durum</th>
+                                        <th>Tarih</th><th>Giriş Saati</th><th>Çıkış Saati</th><th>Kaynak</th><th>Durum</th><th style="width:60px">İşlem</th>
                                     </tr></thead>
                                     <tbody>
                                         <tr v-for="g in grupluGirisCikis" :key="g.tarih"
@@ -952,7 +1056,8 @@ const uploadResim = async (event) => {
                                                 <span v-else class="text-gray-300">—</span>
                                             </td>
                                             <td>
-                                                <span v-if="g.kaynak === 'Mobil Uygulama' || g.kaynak === 'Mobil Gecmis'" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">📱 Mobil</span>
+                                                <span v-if="g.kaynak === 'Manuel Düzeltme'" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-200">✏️ Manuel</span>
+                                                <span v-else-if="g.kaynak === 'Mobil Uygulama' || g.kaynak === 'Mobil Gecmis'" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-violet-100 text-violet-700 border border-violet-200">📱 Mobil</span>
                                                 <span v-else-if="g.kaynak === 'Toplu İşlem'" class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-700 border border-blue-200">📋 Toplu</span>
                                                 <span v-else class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">🖥 Cihaz</span>
                                             </td>
@@ -962,10 +1067,46 @@ const uploadResim = async (event) => {
                                                 </span>
                                                 <span v-else class="text-green-600">Başarılı</span>
                                             </td>
+                                            <td>
+                                                <div class="flex gap-1">
+                                                    <button @click="pdksGunuDuzenle(g)" class="text-blue-500 hover:text-blue-700 text-[11px]" title="Düzenle">✏️</button>
+                                                    <button @click="pdksGunuSil(g)" class="text-red-500 hover:text-red-700 text-[11px]" title="Sil">🗑️</button>
+                                                </div>
+                                            </td>
                                         </tr>
-                                        <tr v-if="!grupluGirisCikis.length"><td colspan="5" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
+                                        <tr v-if="!grupluGirisCikis.length"><td colspan="6" class="text-center text-gray-400 py-6">Kayıt yok</td></tr>
                                     </tbody>
                                 </table>
+
+                                <!-- Düzenleme Modalı -->
+                                <div v-if="pdksDuzenleModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" @click.self="pdksDuzenleModal = false">
+                                    <div class="bg-white rounded-lg shadow-xl p-4 w-[500px] max-h-[80vh] overflow-y-auto">
+                                        <h3 class="font-bold text-sm mb-3 text-gray-800">📝 {{ pdksDuzenleGun?.tarih }} — Kayıtları Düzenle</h3>
+                                        <table class="w-full text-xs border">
+                                            <thead class="bg-gray-100"><tr><th class="p-1.5 text-left">Saat</th><th class="p-1.5 text-left">Tip</th><th class="p-1.5">İşlem</th></tr></thead>
+                                            <tbody>
+                                                <tr v-for="k in pdksDuzenleKayitlar" :key="k.id" class="border-t">
+                                                    <td class="p-1.5">
+                                                        <input v-model="k.editSaat" type="time" class="text-xs border border-gray-300 rounded px-1 py-0.5 w-20" />
+                                                    </td>
+                                                    <td class="p-1.5">
+                                                        <select v-model="k.editTip" class="text-xs border border-gray-300 rounded px-1 py-0.5">
+                                                            <option value="Giriş">Giriş</option>
+                                                            <option value="Çıkış">Çıkış</option>
+                                                        </select>
+                                                    </td>
+                                                    <td class="p-1.5 text-center">
+                                                        <button @click="pdksKayitGuncelle(k)" class="text-blue-600 hover:text-blue-800 text-[10px] font-bold mr-1">💾</button>
+                                                        <button @click="pdksKayitSil(k)" class="text-red-600 hover:text-red-800 text-[10px] font-bold">🗑️</button>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                        <div class="mt-3 flex justify-end">
+                                            <button @click="pdksDuzenleModal = false" class="px-3 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300">Kapat</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- İZİN -->
@@ -1159,7 +1300,7 @@ const uploadResim = async (event) => {
                                             <td>{{ m.son_cikis ? m.son_cikis.substring(11, 16) : '-' }}</td>
                                             <td class="text-center">{{ dakikaToSaat(m.toplam_calisma_suresi) }}</td>
                                             <td class="text-center">
-                                                <input :value="m.fazla_mesai_dakika" type="number" class="w-16 text-center text-xs border rounded px-1 py-0.5 font-bold text-orange-600"
+                                                <input :value="m.fazla_mesai_dakika" type="text" inputmode="numeric" class="w-16 text-center text-xs border rounded px-1 py-0.5 font-bold text-orange-600"
                                                     @change="mesaiGuncelle(m, $event.target.value)" title="Fazla mesai dakikasını düzenle" />
                                             </td>
                                             <td>

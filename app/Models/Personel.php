@@ -30,6 +30,7 @@ class Personel extends Model
         'servis_id',
         'puantaj_parametre_id',
         'aylik_puantaj_parametre_id',
+        'vardiya_id',
         'kart_no',
         'ad_soyad', // Still keeping ad_soyad for backward compatibility
         'ad',
@@ -126,5 +127,10 @@ class Personel extends Model
     public function aylikPuantajParametresi()
     {
         return $this->belongsTo(AylikPuantajParametresi::class, 'aylik_puantaj_parametre_id');
+    }
+
+    public function vardiya()
+    {
+        return $this->belongsTo(Vardiya::class, 'vardiya_id');
     }
 }

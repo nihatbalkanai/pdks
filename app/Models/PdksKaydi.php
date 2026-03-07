@@ -35,4 +35,13 @@ class PdksKaydi extends Model
     {
         return $this->belongsTo(Personel::class, 'personel_id');
     }
+
+    /**
+     * JSON serileştirmede UTC'ye dönüştürmeyi engelle
+     * Tarihleri Türkiye saatinde tut
+     */
+    protected function serializeDate(\DateTimeInterface $date): string
+    {
+        return $date->format('Y-m-d H:i:s');
+    }
 }

@@ -14,8 +14,14 @@ class VardiyaController extends Controller
         $firma_id = Auth::user()->firma_id ?? 1;
         $vardiyalar = Vardiya::where('firma_id', $firma_id)->orderBy('ad')->get();
 
+        $gunlukParams = \App\Models\GunlukPuantajParametresi::withoutGlobalScopes()
+            ->where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->get(['id', 'ad', 'mola_suresi']);
+
         return Inertia::render('HesapParam/Vardiyalar', [
             'vardiyalar' => $vardiyalar,
+            'gunlukPuantajParametreleri' => $gunlukParams,
         ]);
     }
 
@@ -34,7 +40,7 @@ class VardiyaController extends Controller
         if (!empty($validated['baslangic_saati']) && !empty($validated['bitis_saati'])) {
             $bas = \Carbon\Carbon::createFromFormat('H:i', $validated['baslangic_saati']);
             $bit = \Carbon\Carbon::createFromFormat('H:i', $validated['bitis_saati']);
-            $validated['toplam_sure'] = $bit->diffInMinutes($bas);
+            $validated['toplam_sure'] = abs($bit->diffInMinutes($bas));
         }
 
         $vardiya = Vardiya::create(array_merge($validated, ['firma_id' => $firma_id]));
@@ -54,7 +60,7 @@ class VardiyaController extends Controller
         if (!empty($validated['baslangic_saati']) && !empty($validated['bitis_saati'])) {
             $bas = \Carbon\Carbon::createFromFormat('H:i', $validated['baslangic_saati']);
             $bit = \Carbon\Carbon::createFromFormat('H:i', $validated['bitis_saati']);
-            $validated['toplam_sure'] = $bit->diffInMinutes($bas);
+            $validated['toplam_sure'] = abs($bit->diffInMinutes($bas));
         }
 
         $vardiya->update($validated);

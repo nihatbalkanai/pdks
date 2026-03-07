@@ -246,8 +246,20 @@ const kopyaOlustur = () => {
                             <!-- BORDRO ALANLARI -->
                             <div class="mt-6 border-t border-gray-300 pt-4">
                                 <div class="flex justify-between items-center mb-2">
-                                    <h4 class="font-bold text-xs text-gray-700">Bordro Alanları</h4>
+                                    <h4 class="font-bold text-xs text-gray-700">Bordro Alanları <span class="font-normal text-gray-400">(Mesai Kuralları)</span></h4>
                                     <button @click="openBordroModal()" class="bg-green-500 hover:bg-green-600 text-white rounded p-1.5" title="Yeni Bordro Alanı"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg></button>
+                                </div>
+                                <div class="bg-blue-50 border border-blue-200 rounded px-3 py-2 mb-3 text-[10px] text-blue-800 leading-relaxed">
+                                    <b>ℹ️ Nasıl Çalışır?</b> Bu kurallar, personelin çıkış saatine göre hangi mesai türünün uygulanacağını belirler.
+                                    <ul class="mt-1 ml-3 list-disc space-y-0.5">
+                                        <li><b>Başla / Bitiş:</b> Mesainin geçerli olduğu saat aralığı (Örn: 18:00-22:00)</li>
+                                        <li><b>Min:</b> Bu aralıkta en az bu kadar çalışılırsa mesai sayılır (Örn: 30dk)</li>
+                                        <li><b>Max:</b> Bu aralıkta en fazla bu kadar mesai yazılır (Örn: 4 saat)</li>
+                                        <li><b>Çarpan:</b> 150 = %50 FM (x1.5), 200 = %100 FM (x2.0)</li>
+                                    </ul>
+                                    <div class="mt-1 text-blue-600">
+                                        <b>Örnek:</b> Çıkış 20:00 → 18:00-20:00 arası 2 saat → Min 30dk ✓ → Max 4 saat ✓ → %50 FM olarak <b>2 saat</b> yazılır.
+                                    </div>
                                 </div>
                                 <table class="w-full text-xs text-left bg-white border border-gray-200">
                                     <thead class="bg-gray-100 text-gray-600 uppercase">

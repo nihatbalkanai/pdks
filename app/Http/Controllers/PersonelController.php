@@ -58,6 +58,13 @@ class PersonelController extends Controller
             ->orderBy('sube_adi')
             ->get(['id', 'sube_adi', 'lokasyon_enlem', 'lokasyon_boylam']);
 
+        // Vardiya listesi
+        $vardiyalar = \App\Models\Vardiya::withoutGlobalScopes()
+            ->where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->orderBy('ad')
+            ->get(['id', 'ad', 'baslangic_saati', 'bitis_saati', 'toplam_sure']);
+
         return Inertia::render('Personel/Index', [
             'personeller' => $personeller,
             'filtreler' => $request->only(['arama']),
@@ -65,6 +72,7 @@ class PersonelController extends Controller
             'aylikPuantajParametreleri' => $aylikPuantajParametreleri,
             'gunlukPuantajParametreleri' => $gunlukPuantajParametreleri,
             'subeler' => $subeler,
+            'vardiyalar' => $vardiyalar,
         ]);
     }
 
@@ -102,6 +110,7 @@ class PersonelController extends Controller
             'dogum_tarihi' => 'nullable|date',
             'puantaj_parametre_id' => 'nullable|exists:gunluk_puantaj_parametreleri,id',
             'aylik_puantaj_parametre_id' => 'nullable|exists:aylik_puantaj_parametreleri,id',
+            'vardiya_id' => 'nullable|exists:vardiyalar,id',
             'tc_no' => 'nullable|digits:11',
             'iban_no' => 'nullable|string|max:34',
             'adres' => 'nullable|string',
@@ -326,6 +335,7 @@ class PersonelController extends Controller
             'dogum_tarihi' => 'nullable|date',
             'puantaj_parametre_id' => 'nullable|exists:gunluk_puantaj_parametreleri,id',
             'aylik_puantaj_parametre_id' => 'nullable|exists:aylik_puantaj_parametreleri,id',
+            'vardiya_id' => 'nullable|exists:vardiyalar,id',
             'tc_no' => 'nullable|digits:11',
             'iban_no' => 'nullable|string|max:34',
             'adres' => 'nullable|string',
@@ -407,5 +417,59 @@ class PersonelController extends Controller
         $personel->delete();
 
         return response()->json(['success' => true, 'message' => 'Personel başarıyla silindi.']);
+    }
+
+    /**
+     * Manuel PDKS kaydı ekleme
+     */
+    public function pdksEkle(Request $request, $personelId)
+    {
+        $validated = $request->validate([
+            'tarih' => 'required|date',
+            'saat' => 'required|date_format:H:i',
+            'islem_tipi' => 'required|in:Giriş,Çıkış',
+        ]);
+
+        $kayitTarihi = $validated['tarih'] . ' ' . $validated['saat'] . ':00';
+
+        $kayit = PdksKaydi::create([
+            'firma_id' => Auth::user()->firma_id ?? 1,
+            'personel_id' => $personelId,
+            'kayit_tarihi' => $kayitTarihi,
+            'islem_tipi' => $validated['islem_tipi'],
+            'ham_veri' => ['kaynak' => 'Manuel Düzeltme', 'ekleyen' => Auth::user()->name ?? 'Admin'],
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Kayıt eklendi.', 'kayit' => $kayit]);
+    }
+
+    /**
+     * PDKS kaydı güncelleme
+     */
+    public function pdksGuncelle(Request $request, $personelId, $kayitId)
+    {
+        $validated = $request->validate([
+            'tarih' => 'required|date',
+            'saat' => 'required|date_format:H:i',
+            'islem_tipi' => 'required|in:Giriş,Çıkış',
+        ]);
+
+        $kayit = PdksKaydi::withoutGlobalScopes()->findOrFail($kayitId);
+        $kayit->kayit_tarihi = $validated['tarih'] . ' ' . $validated['saat'] . ':00';
+        $kayit->islem_tipi = $validated['islem_tipi'];
+        $kayit->save();
+
+        return response()->json(['success' => true, 'message' => 'Kayıt güncellendi.']);
+    }
+
+    /**
+     * PDKS kaydı silme
+     */
+    public function pdksSil($personelId, $kayitId)
+    {
+        $kayit = PdksKaydi::withoutGlobalScopes()->findOrFail($kayitId);
+        $kayit->delete();
+
+        return response()->json(['success' => true, 'message' => 'Kayıt silindi.']);
     }
 }

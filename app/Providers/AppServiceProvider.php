@@ -22,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
     {
         Vite::prefetch(concurrency: 3);
 
+        // Tüm Eloquent modellerinde tarih serileştirmeyi Türkiye saatinde tut (UTC'ye dönüştürme)
+        \Illuminate\Support\Facades\Date::serializeUsing(function (\DateTimeInterface $date) {
+            return $date->format('Y-m-d H:i:s');
+        });
+
         // RBAC: Rol Bazlı Yetkilendirme Kontrolleri
         \Illuminate\Support\Facades\Gate::define('sistem_yonetimi', function ($user) {
             return $user->rol === 'admin'; // Sistem Admin

@@ -108,6 +108,13 @@ class PuantajHesaplamaController extends Controller
             ->map(fn($t) => Carbon::parse($t)->format('Y-m-d'))
             ->toArray();
 
+        // === BORDRO ALANLARINI YÜKLE (Dinamik) ===
+        $bordroAlanlari = \Illuminate\Support\Facades\DB::table('bordro_alanlari')
+            ->where('firma_id', $firma_id)
+            ->whereNull('deleted_at')
+            ->orderBy('kod')
+            ->get();
+
         $sonuclar = [];
         $personeller = Personel::withoutGlobalScopes()
             ->where('firma_id', $firma_id)
@@ -143,18 +150,38 @@ class PuantajHesaplamaController extends Controller
             $standartAyGun = $aylikParam && $aylikParam->standart_ay_gunu > 0 
                 ? (int)$aylikParam->standart_ay_gunu : 30;
 
-            // Günlük çalışma saati (vardiya parametresinden)
+            // Günlük çalışma saati — Öncelik: Vardiya > Günlük Param > Aylık Param > Varsayılan
             $gunlukCalismaSaat = 9.0; // varsayılan
-            if ($puantajParam && $puantajParam->iceri_giris_saati && $puantajParam->disari_cikis_saati) {
+            $molaSuresi = 0;
+
+            // 1. Vardiya tanımından al (en öncelikli)
+            $vardiya = null;
+            if ($personel->vardiya_id) {
+                $vardiya = \App\Models\Vardiya::withoutGlobalScopes()->find($personel->vardiya_id);
+            }
+
+            if ($vardiya && $vardiya->baslangic_saati && $vardiya->bitis_saati) {
+                // Vardiya BRÜT süresini hesapla
+                $brutDakika = abs($vardiya->toplam_sure) > 0
+                    ? abs($vardiya->toplam_sure)
+                    : abs(Carbon::parse($vardiya->bitis_saati)->diffInMinutes(Carbon::parse($vardiya->baslangic_saati)));
+                // Mola süresi puantaj parametresinden alınır
+                $molaSuresi = $puantajParam ? (int)($puantajParam->mola_suresi ?? 0) : 0;
+                // NET çalışma = brüt - mola (Örn: 600 - 60 = 540dk = 9 saat)
+                $gunlukCalismaSaat = max(0, $brutDakika - $molaSuresi) / 60;
+            } elseif ($puantajParam && $puantajParam->iceri_giris_saati && $puantajParam->disari_cikis_saati) {
+                // 2. Günlük puantaj parametresinden al
                 $g = Carbon::parse($puantajParam->iceri_giris_saati);
                 $c = Carbon::parse($puantajParam->disari_cikis_saati);
-                $gunlukCalismaSaat = abs($c->diffInMinutes($g)) / 60;
+                $brutDakika = abs($c->diffInMinutes($g));
+                $molaSuresi = (int)($puantajParam->mola_suresi ?? 0);
+                // NET çalışma = brüt - mola
+                $gunlukCalismaSaat = max(0, $brutDakika - $molaSuresi) / 60;
             } elseif ($aylikParam && $aylikParam->gunluk_calisma_saati > 0) {
+                // 3. Aylık parametreden al (zaten NET değer)
                 $gunlukCalismaSaat = (float)$aylikParam->gunluk_calisma_saati;
             }
             $gunlukCalismaDakika = (int)round($gunlukCalismaSaat * 60);
-
-            $molaSuresi = $puantajParam ? (int)($puantajParam->mola_suresi ?? 0) : 0;
 
             // Çarpanlar ve parametreler (veritabanından)
             $fm50Carpan = $aylikParam ? (float)$aylikParam->fazla_mesai_carpani : 1.5;
@@ -162,6 +189,19 @@ class PuantajHesaplamaController extends Controller
             $fmToleransDakika = $aylikParam ? (int)($aylikParam->fazla_mesai_tolerans_dakika ?? self::FM_TOLERANS_DAKIKA_DEFAULT) : self::FM_TOLERANS_DAKIKA_DEFAULT;
             $gunFarkHesapla = $aylikParam ? (bool)($aylikParam->gun_fark_hesapla ?? true) : true;
             $sskToplamaDahil = $aylikParam ? (bool)($aylikParam->ssk_rapor_toplama_dahil ?? false) : false;
+
+            // === GÜNLÜK PUANTAJ BORDRO ALANLARI (Mesai Kuralları) ===
+            // Her günlük puantaj parametresine bağlı mesai kuralları:
+            // Başla/Bitiş: Mesainin geçerli olduğu saat aralığı
+            // Çarpan: 150 = x1.5 (%50 FM), 200 = x2.0 (%100 FM)
+            // Min/Max: Minimum ve maksimum mesai süresi
+            $puantajBordroKurallari = [];
+            if ($puantajParam) {
+                $puantajBordroKurallari = GunlukPuantajBordroAlani::where('gunluk_puantaj_id', $puantajParam->id)
+                    ->orderBy('basla')
+                    ->get()
+                    ->toArray();
+            }
 
             // === ÜCRET HESABI (ÖRNEK 30 GÜN / 225 SAAT STANDARDI ÜZERİNDEN DİNAMİK) ===
             $aylikUcret = (float)($personel->aylik_ucret ?? 0);
@@ -184,6 +224,7 @@ class PuantajHesaplamaController extends Controller
                 $izinBaslangic = Carbon::parse($izin->tarih);
                 $izinBitis = Carbon::parse($izin->bitis_tarihi ?? $izin->tarih);
                 $izinTuruAd = $izin->izinTuru ? mb_strtolower($izin->izinTuru->ad) : '';
+                $izinTuruAdOriginal = $izin->izinTuru ? $izin->izinTuru->ad : 'Bilinmeyen';
                 
                 if (str_contains($izinTuruAd, 'rapor')) {
                     $izinTipiStr = 'rapor';
@@ -191,8 +232,15 @@ class PuantajHesaplamaController extends Controller
                     $izinTipiStr = ($izin->izinTuru && $izin->izinTuru->ucret_kesintisi_yapilacak_mi) ? 'ucretsiz' : 'ucretli';
                 }
 
+                // İzin türü adını bordro koduna eşle
+                $bordroKod = $this->izinTuruBordroKodu($izinTuruAd, $izinTipiStr);
+
                 for ($d = $izinBaslangic->copy(); $d->lte($izinBitis); $d->addDay()) {
-                    $izinliGunler[$d->format('Y-m-d')] = $izinTipiStr;
+                    $izinliGunler[$d->format('Y-m-d')] = [
+                        'tip' => $izinTipiStr,
+                        'izin_turu_adi' => $izinTuruAdOriginal,
+                        'bordro_kod' => $bordroKod,
+                    ];
                 }
                 if ($izin->ssk_odeme_tutari != null && $izin->ssk_odeme_tutari > 0) {
                     $toplamSskOdemesi += (float) $izin->ssk_odeme_tutari;
@@ -231,16 +279,17 @@ class PuantajHesaplamaController extends Controller
 
             // ===== AYLIK RAPOR GÜN SAYISI KONTROLÜ =====
             $aydakiToplamRaporGunu = 0;
-            foreach ($izinliGunler as $izinTarih => $tip) {
-                if ($tip === 'rapor') {
+            foreach ($izinliGunler as $izinTarih => $izinBilgi) {
+                if ($izinBilgi['tip'] === 'rapor') {
                     $d = Carbon::parse($izinTarih);
                     if ($d->between($baslangic, $bitis)) {
-                        // Seçili dönem veya ay içindeki toplam rapor günü sayılıyor
-                        // (Personelin aktif olup olmadığı günlük döngüde kontrol edilirken, burada genel bir sayı hesaplanır)
                         $aydakiToplamRaporGunu++;
                     }
                 }
             }
+
+            // Bordro alanları bazında izin sayaçları
+            $bordroIzinSayac = [];
 
             // ===== GÜN GÜN HESAPLAMA =====
             $gunler = [];
@@ -262,7 +311,8 @@ class PuantajHesaplamaController extends Controller
                 $haftaGunu = $gun->dayOfWeekIso; // 1=Pzt, 7=Paz
                 $haftaSonu = $haftaGunu >= 6;
                 $resmiTatilMi = in_array($tarih, $resmiTatiller);
-                $izinTipi = $izinliGunler[$tarih] ?? null;
+                $izinBilgi = $izinliGunler[$tarih] ?? null;
+                $izinTipi = $izinBilgi ? $izinBilgi['tip'] : null;
 
                 // Personel bu tarihte aktif mi?
                 $girisDate = $personel->giris_tarihi ? Carbon::parse($personel->giris_tarihi) : null;
@@ -287,28 +337,37 @@ class PuantajHesaplamaController extends Controller
                     if ($giris && $cikis) {
                         $calismaDakika = max(0, abs($cikis->diffInMinutes($giris)) - $molaSuresi);
                     }
-                    $gelinenGunSayisi++; // Kişi bu gün giriş yapmış (işe gelmiş)
                 }
 
                 if ($izinTipi) {
-                    // İzinli gün
+                    // İzinli gün — çalışma kayıtları yok sayılır, fazla mesai hesaplanmaz
+                    $calismaDakika = 0;
+                    $giris = null;
+                    $cikis = null;
+                    $izinBordroKod = $izinBilgi['bordro_kod'] ?? null;
+                    
                     if ($izinTipi === 'ucretsiz') {
                         $durum = 'ucretsiz_izin';
                         $ucretsizIzinGun++;
+                        $izinBordroKod = $izinBordroKod ?: 6;
                     } elseif ($izinTipi === 'rapor') {
                         if ($aydakiToplamRaporGunu <= 2) {
                             $durum = 'rapor_ucretli_firma';
-                            // Toplam rapor süresi 2 güne kadarsa TAMAMINI firma öder (maaştan kesilmez)
                             $normalCalismaGun++;
+                            $izinBordroKod = 21;
                         } else {
                             $durum = 'rapor_sgk';
-                            // Toplam rapor süresi 3 gün veya üzeri ise TAMAMINI SGK öder
-                            // Maaş hesabına geçmemesi (düşmesi) için tamamı ücretsiz izin olarak sayılır
                             $ucretsizIzinGun++;
+                            $izinBordroKod = 22;
                         }
                     } else {
                         $durum = 'ucretli_izin';
                         $ucretliIzinGun++;
+                        $izinBordroKod = $izinBordroKod ?: 5;
+                    }
+                    // Bordro izin sayacını artır
+                    if ($izinBordroKod) {
+                        $bordroIzinSayac[$izinBordroKod] = ($bordroIzinSayac[$izinBordroKod] ?? 0) + 1;
                     }
                 } elseif ($resmiTatilMi) {
                     if ($calismaDakika > 0) {
@@ -339,12 +398,42 @@ class PuantajHesaplamaController extends Controller
                 } else {
                     // Normal iş günü — çalışmış
                     $normalCalismaGun++;
+                    $gelinenGunSayisi++; // İzinsiz, iş günü, gelmiş = işe gelinen gün
 
-                    // Fazla mesai kontrolü (günlük standart saatten fazla çalışma)
-                    // Tolerans: DB parametresinden (varsayılan: 5 dk)
+                    // Fazla mesai kontrolü
+                    // Bordro kuralları varsa onlara göre, yoksa basit hesaplama
                     $fmFark = $calismaDakika - $gunlukCalismaDakika;
                     if ($fmFark > $fmToleransDakika) {
-                        $fm50Dakika += $fmFark;
+                        if (!empty($puantajBordroKurallari) && $cikis) {
+                            // Kural bazlı mesai hesaplama
+                            $cikisSaat = Carbon::parse($tarih . ' ' . $cikis);
+                            foreach ($puantajBordroKurallari as $kural) {
+                                $kuralBasla = Carbon::parse($tarih . ' ' . $kural['basla']);
+                                $kuralBitis = Carbon::parse($tarih . ' ' . $kural['bitis']);
+                                $minDk = $this->saatToDakika($kural['min_sure'] ?? '00:00:00');
+                                $maxDk = $this->saatToDakika($kural['max_sure'] ?? '24:00:00');
+                                $carpan = ($kural['carpan'] ?? 150);
+
+                                // Çıkış saati bu kuralın aralığında mı?
+                                if ($cikisSaat->gte($kuralBasla)) {
+                                    // Kural aralığında çalışılan dakika
+                                    $kuralSonSaat = $cikisSaat->gt($kuralBitis) ? $kuralBitis : $cikisSaat;
+                                    $kuralDakika = max(0, $kuralSonSaat->diffInMinutes($kuralBasla));
+                                    // Min/Max sınırları uygula
+                                    if ($kuralDakika >= $minDk) {
+                                        $kuralDakika = min($kuralDakika, $maxDk);
+                                        if ($carpan >= 200) {
+                                            $fm100Dakika += $kuralDakika;
+                                        } else {
+                                            $fm50Dakika += $kuralDakika;
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            // Kural yoksa: tüm fark %50 mesai
+                            $fm50Dakika += $fmFark;
+                        }
                     }
 
                     // Geç gelme kontrolü
@@ -493,40 +582,14 @@ class PuantajHesaplamaController extends Controller
                 'cikis_tarihi' => $personel->cikis_tarihi ? Carbon::parse($personel->cikis_tarihi)->format('d.m.Y') : '',
                 'gunler' => $gunler,
                 'bordro' => [
-                    'normal_calisma' => [
-                        'gun' => number_format($normalCalismaGunGosterim, 2, ',', '.'),
-                        'saat' => $fmtSaat($normalSaatGosterim),
-                        'ucret' => $fmtPara($normalUcret),
-                    ],
-                    'fazla_mesai_50' => [
-                        'saat' => $fmt($fm50Dakika),
-                        'ucret' => $fmtPara($fm50Ucret),
-                    ],
-                    'fazla_mesai_100' => [
-                        'gun' => number_format($fm100Gun, 2, ',', '.'),
-                        'saat' => $fmt($fm100Dakika),
-                        'ucret' => $fmtPara($fm100Ucret),
-                    ],
-                    'devamsizlik' => [
-                        'gun' => number_format($devamsizlikGun, 2, ',', '.'),
-                        'saat' => $fmtSaat($devSaat),
-                        'ucret' => $fmtPara($devUcret),
-                    ],
-                    'hafta_tatili' => [
-                        'gun' => number_format($haftaTatiliGun, 2, ',', '.'),
-                        'saat' => $fmtSaat($htSaat),
-                        'ucret' => $fmtPara($htUcret),
-                    ],
-                    'ucretsiz_izin' => [
-                        'gun' => number_format($ucretsizIzinGun, 2, ',', '.'),
-                        'saat' => $fmtSaat($uiSaat),
-                        'ucret' => $fmtPara($uiUcret),
-                    ],
-                    'ucretli_izin' => [
-                        'gun' => number_format($ucretliIzinGun, 2, ',', '.'),
-                        'saat' => $fmtSaat($uciSaat),
-                        'ucret' => $fmtPara($uciUcret),
-                    ],
+                    // === ESKİ FORMAT (Mevcut frontend uyumluluğu) ===
+                    'normal_calisma' => ['gun' => number_format($normalCalismaGunGosterim, 2, ',', '.'), 'saat' => $fmtSaat($normalSaatGosterim), 'ucret' => $fmtPara($normalUcret)],
+                    'fazla_mesai_50' => ['saat' => $fmt($fm50Dakika), 'ucret' => $fmtPara($fm50Ucret)],
+                    'fazla_mesai_100' => ['gun' => number_format($fm100Gun, 2, ',', '.'), 'saat' => $fmt($fm100Dakika), 'ucret' => $fmtPara($fm100Ucret)],
+                    'devamsizlik' => ['gun' => number_format($devamsizlikGun, 2, ',', '.'), 'saat' => $fmtSaat($devSaat), 'ucret' => $fmtPara($devUcret)],
+                    'hafta_tatili' => ['gun' => number_format($haftaTatiliGun, 2, ',', '.'), 'saat' => $fmtSaat($htSaat), 'ucret' => $fmtPara($htUcret)],
+                    'ucretsiz_izin' => ['gun' => number_format($ucretsizIzinGun, 2, ',', '.'), 'saat' => $fmtSaat($uiSaat), 'ucret' => $fmtPara($uiUcret)],
+                    'ucretli_izin' => ['gun' => number_format($ucretliIzinGun, 2, ',', '.'), 'saat' => $fmtSaat($uciSaat), 'ucret' => $fmtPara($uciUcret)],
                     'avans' => $fmtPara($toplamAvans),
                     'ek_odeme' => $fmtPara($toplamEkOdeme),
                     'yol_parasi' => $fmtPara($yolParasiTutar),
@@ -536,6 +599,20 @@ class PuantajHesaplamaController extends Controller
                     'gun_fark' => $fmtPara($gunFarkUcret),
                     'elden_odeme' => $fmtPara($eldenOdeme),
                     'toplam' => $fmtPara($toplam),
+                    // === YENİ DİNAMİK FORMAT (Bordro Alanlarından) ===
+                    'satirlar' => $this->bordroOlustur(
+                        $bordroAlanlari, $fmtPara, $fmtSaat, $fmt,
+                        $normalCalismaGunGosterim, $normalSaatGosterim, $normalUcret,
+                        $fm50Dakika, $fm50Ucret, $fm100Gun, $fm100Dakika, $fm100Ucret,
+                        $devamsizlikGun, $devSaat, $devUcret,
+                        $haftaTatiliGun, $htSaat, $htUcret,
+                        $ucretsizIzinGun, $uiSaat, $uiUcret,
+                        $ucretliIzinGun, $uciSaat, $uciUcret,
+                        $toplamAvans, $toplamEkOdeme, $yolParasiTutar, $yemekTutar,
+                        $toplamSskOdemesi, $toplamKesinti, $gunFarkUcret, $eldenOdeme, $toplam,
+                        $resmiTatilGun, $gunlukCalismaSaat, $gunlukUcret,
+                        $bordroIzinSayac
+                    ),
                 ],
                 'ozet' => [
                     'toplam_gun' => $toplamTakvimGunu,
@@ -558,5 +635,125 @@ class PuantajHesaplamaController extends Controller
                 'bitis' => $bitis->format('d.m.Y'),
             ],
         ]);
+    }
+
+    /**
+     * HH:MM:SS formatındaki süreyi dakikaya çevirir
+     */
+    private function saatToDakika(?string $saat): int
+    {
+        if (!$saat) return 0;
+        $parts = explode(':', $saat);
+        $h = (int)($parts[0] ?? 0);
+        $m = (int)($parts[1] ?? 0);
+        return ($h * 60) + $m;
+    }
+
+    /**
+     * İzin türü adını bordro koduna eşler
+     */
+    private function izinTuruBordroKodu(string $izinTuruAd, string $izinTipiStr): ?int
+    {
+        $ad = mb_strtolower($izinTuruAd);
+        
+        if (str_contains($ad, 'babalık') || str_contains($ad, 'babalik')) return 15;
+        if (str_contains($ad, 'evlenme') || str_contains($ad, 'evlilik')) return 16;
+        if (str_contains($ad, 'ölüm') || str_contains($ad, 'olum') || str_contains($ad, 'vefat')) return 17;
+        if (str_contains($ad, 'doğum') || str_contains($ad, 'dogum')) return 18;
+        if (str_contains($ad, 'süt') || str_contains($ad, 'sut')) return 19;
+        if (str_contains($ad, 'mazeret')) return 20;
+        if (str_contains($ad, 'rapor')) return null; // Rapor günü, hesapla() içinde ilk 2 gün / 3+ gün ayrımı yapılır
+        
+        // Genel izin türleri
+        if ($izinTipiStr === 'ucretsiz') return 6;
+        if ($izinTipiStr === 'ucretli') return 5; // Yıllık İzin (varsayılan ücretli)
+        
+        return null;
+    }
+
+    /**
+     * Bordro çıktısını bordro_alanlari tablosundan dinamik oluşturur
+     */
+    private function bordroOlustur(
+        $bordroAlanlari, $fmtPara, $fmtSaat, $fmt,
+        $normalCalismaGunGosterim, $normalSaatGosterim, $normalUcret,
+        $fm50Dakika, $fm50Ucret, $fm100Gun, $fm100Dakika, $fm100Ucret,
+        $devamsizlikGun, $devSaat, $devUcret,
+        $haftaTatiliGun, $htSaat, $htUcret,
+        $ucretsizIzinGun, $uiSaat, $uiUcret,
+        $ucretliIzinGun, $uciSaat, $uciUcret,
+        $toplamAvans, $toplamEkOdeme, $yolParasiTutar, $yemekTutar,
+        $toplamSskOdemesi, $toplamKesinti, $gunFarkUcret, $eldenOdeme, $toplam,
+        $resmiTatilGun, $gunlukCalismaSaat, $gunlukUcret,
+        $bordroIzinSayac
+    ): array {
+        $bordro = [];
+
+        // Kod bazlı değer haritası
+        $kodDeger = [
+            1  => ['gun' => $normalCalismaGunGosterim, 'saat_raw' => $normalSaatGosterim, 'ucret' => $normalUcret, 'fmt' => 'saat'],
+            2  => ['saat_raw_dk' => $fm50Dakika, 'ucret' => $fm50Ucret, 'fmt' => 'dakika'],
+            3  => ['gun' => $fm100Gun, 'saat_raw_dk' => $fm100Dakika, 'ucret' => $fm100Ucret, 'fmt' => 'dakika'],
+            4  => ['gun' => $devamsizlikGun, 'saat_raw' => $devSaat, 'ucret' => $devUcret, 'fmt' => 'saat'],
+            5  => ['gun' => $ucretliIzinGun, 'saat_raw' => $uciSaat, 'ucret' => $uciUcret, 'fmt' => 'saat'],
+            6  => ['gun' => $ucretsizIzinGun, 'saat_raw' => $uiSaat, 'ucret' => $uiUcret, 'fmt' => 'saat'],
+            7  => ['ucret' => $toplamAvans, 'fmt' => 'para'],
+            8  => ['gun' => $haftaTatiliGun, 'saat_raw' => $htSaat, 'ucret' => $htUcret, 'fmt' => 'saat'],
+            9  => ['ucret' => $toplamEkOdeme, 'fmt' => 'para'],
+            10 => ['ucret' => $yolParasiTutar, 'fmt' => 'para'],
+            11 => ['ucret' => $toplamKesinti, 'fmt' => 'para'],
+            12 => ['ucret' => $gunFarkUcret, 'fmt' => 'para'],
+            13 => ['ucret' => $yemekTutar, 'fmt' => 'para'],
+            14 => ['ucret' => 0, 'fmt' => 'para'], // Servis ücreti (henüz hesaplanmıyor)
+            23 => ['gun' => $resmiTatilGun, 'fmt' => 'saat'],
+        ];
+
+        // İzin bazlı kodlar (15-22): bordroIzinSayac'tan gelen gün sayıları
+        foreach ($bordroIzinSayac as $kod => $gunSayisi) {
+            $izinSaat = $gunSayisi * $gunlukCalismaSaat;
+            $izinUcret = $gunlukUcret * $gunSayisi;
+            $kodDeger[$kod] = ['gun' => $gunSayisi, 'saat_raw' => $izinSaat, 'ucret' => $izinUcret, 'fmt' => 'saat'];
+        }
+
+        foreach ($bordroAlanlari as $alan) {
+            $kod = $alan->kod;
+            $deger = $kodDeger[$kod] ?? null;
+
+            $item = [
+                'kod' => $kod,
+                'aciklama' => $alan->aciklama,
+                'bordro_tipi' => $alan->bordro_tipi,
+            ];
+
+            if ($deger) {
+                if ($alan->gun) {
+                    $item['gun'] = number_format($deger['gun'] ?? 0, 2, ',', '.');
+                }
+                if ($alan->saat) {
+                    if (($deger['fmt'] ?? '') === 'dakika') {
+                        $item['saat'] = $fmt($deger['saat_raw_dk'] ?? 0);
+                    } else {
+                        $item['saat'] = $fmtSaat($deger['saat_raw'] ?? 0);
+                    }
+                }
+                if ($alan->ucret) {
+                    $item['ucret'] = $fmtPara($deger['ucret'] ?? 0);
+                }
+            } else {
+                // Bordro alanında veri yoksa boş göster
+                if ($alan->gun) $item['gun'] = '0,00';
+                if ($alan->saat) $item['saat'] = '00:00';
+                if ($alan->ucret) $item['ucret'] = '0,00';
+            }
+
+            $bordro[] = $item;
+        }
+
+        // Ek hesaplar (toplam, ssk, elden)
+        $bordro[] = ['kod' => 'ssk', 'aciklama' => 'SGK RAPOR ÖDEMESİ', 'ucret' => $fmtPara($toplamSskOdemesi), 'bordro_tipi' => 'diger_hesaplar_arti'];
+        $bordro[] = ['kod' => 'elden', 'aciklama' => 'ELDEN ÖDEME', 'ucret' => $fmtPara($eldenOdeme), 'bordro_tipi' => 'diger_hesaplar_eksi'];
+        $bordro[] = ['kod' => 'toplam', 'aciklama' => 'TOPLAM (BANKAYA YATAN)', 'ucret' => $fmtPara($toplam), 'bordro_tipi' => 'toplam'];
+
+        return $bordro;
     }
 }

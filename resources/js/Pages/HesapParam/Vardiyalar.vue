@@ -5,7 +5,13 @@ import { Head } from '@inertiajs/vue3';
 import Swal from 'sweetalert2';
 import axios from 'axios';
 
-const props = defineProps({ vardiyalar: Array });
+const props = defineProps({ vardiyalar: Array, gunlukPuantajParametreleri: { type: Array, default: () => [] } });
+
+// Mola süresini günlük puantaj parametrelerinden al (ilk aktif parametrenin mola süresi)
+const molaDakika = computed(() => {
+    const param = props.gunlukPuantajParametreleri?.[0];
+    return param ? (param.mola_suresi || 0) : 0;
+});
 
 const localVardiyalar = ref([...(props.vardiyalar || [])]);
 const selectedIdx = ref(-1);
@@ -79,10 +85,17 @@ const sil = async () => {
 };
 
 const formatSure = (dk) => {
-    if (!dk) return '-';
+    if (!dk && dk !== 0) return '-';
+    dk = Math.abs(dk);
     const s = Math.floor(dk / 60);
     const m = dk % 60;
     return m > 0 ? `${s}s ${m}dk` : `${s} saat`;
+};
+
+const formatNet = (dk) => {
+    if (!dk && dk !== 0) return '-';
+    const net = Math.abs(dk) - molaDakika.value;
+    return formatSure(Math.max(0, net));
 };
 </script>
 
@@ -108,7 +121,9 @@ const formatSure = (dk) => {
                             <th class="py-1.5 px-3 text-left border border-gray-400 font-bold">Vardiya Adı</th>
                             <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-24">Giriş</th>
                             <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-24">Çıkış</th>
-                            <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-24">Süre</th>
+                            <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-24">Brüt</th>
+                            <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-20">Mola</th>
+                            <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-24">Net</th>
                             <th class="py-1.5 px-3 text-center border border-gray-400 font-bold w-16">Renk</th>
                         </tr>
                     </thead>
@@ -120,16 +135,21 @@ const formatSure = (dk) => {
                             <td class="py-1 px-3 border border-gray-300">{{ v.ad }}</td>
                             <td class="py-1 px-3 border border-gray-300 text-center">{{ v.baslangic_saati || '-' }}</td>
                             <td class="py-1 px-3 border border-gray-300 text-center">{{ v.bitis_saati || '-' }}</td>
-                            <td class="py-1 px-3 border border-gray-300 text-center">{{ formatSure(v.toplam_sure) }}</td>
+                            <td class="py-1 px-3 border border-gray-300 text-center text-gray-500">{{ formatSure(v.toplam_sure) }}</td>
+                            <td class="py-1 px-3 border border-gray-300 text-center text-orange-600">{{ molaDakika }} dk</td>
+                            <td class="py-1 px-3 border border-gray-300 text-center font-bold text-green-700">{{ formatNet(v.toplam_sure) }}</td>
                             <td class="py-1 px-3 border border-gray-300 text-center">
                                 <span class="inline-block w-5 h-5 rounded border border-gray-400" :style="{ backgroundColor: v.renk || '#3B82F6' }"></span>
                             </td>
                         </tr>
                         <tr v-if="localVardiyalar.length === 0">
-                            <td colspan="5" class="py-16 text-center text-gray-500 bg-[#d4e2f4]">&lt;Gösterilecek Bilgi yok&gt;</td>
+                            <td colspan="7" class="py-16 text-center text-gray-500 bg-[#d4e2f4]">&lt;Gösterilecek Bilgi yok&gt;</td>
                         </tr>
                     </tbody>
                 </table>
+                <div v-if="molaDakika > 0" class="bg-amber-50 border-t border-amber-200 px-3 py-1.5 text-[10px] text-amber-700">
+                    ℹ️ <b>Net Çalışma = Brüt Süre − Mola ({{ molaDakika }} dk)</b> | Mola süresi Günlük Puantaj Parametrelerinden alınır. Puantaj hesaplamasında <b>Net</b> süre kullanılır.
+                </div>
             </div>
 
             <!-- Alt Form -->

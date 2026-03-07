@@ -24,6 +24,9 @@ Route::middleware(['auth', 'abonelik'])->group(function () {
     // Personel İşlemleri
     Route::resource('personeller', \App\Http\Controllers\PersonelController::class)->parameters(['personeller' => 'personel'])->middleware('rol.yetki:personel_islemleri');
     Route::post('/personeller/{id}/resim', [\App\Http\Controllers\PersonelController::class, 'resimYukle'])->name('personeller.resim-yukle')->middleware('rol.yetki:personel_islemleri');
+    Route::post('/personeller/{id}/pdks', [\App\Http\Controllers\PersonelController::class, 'pdksEkle'])->name('personeller.pdks-ekle')->middleware('rol.yetki:personel_islemleri');
+    Route::put('/personeller/{personelId}/pdks/{kayitId}', [\App\Http\Controllers\PersonelController::class, 'pdksGuncelle'])->name('personeller.pdks-guncelle')->middleware('rol.yetki:personel_islemleri');
+    Route::delete('/personeller/{personelId}/pdks/{kayitId}', [\App\Http\Controllers\PersonelController::class, 'pdksSil'])->name('personeller.pdks-sil')->middleware('rol.yetki:personel_islemleri');
 
     // Hesap Raporları
     Route::get('/hesap-raporlari/puantaj-hesaplama', [\App\Http\Controllers\PuantajHesaplamaController::class, 'index'])->name('hesap-raporlari.puantaj-hesaplama')->middleware('rol.yetki:hesap_puantaj');
