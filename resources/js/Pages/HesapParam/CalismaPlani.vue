@@ -23,9 +23,16 @@ const selectedGrupIdx = ref(-1);
 const showTopluAta = ref(false);
 const topluForm    = ref({ baslangic: '', bitis: '', vardiya_id: '', tur: 'is_gunu', gun_filtre: 'hepsi' });
 
-// AI Plan modal
+// Plan şablonları
 const showAiModal = ref(false);
-const aiForm      = ref({ yil: new Date().getFullYear(), vardiya_id: '' });
+const aiForm      = ref({ yil: new Date().getFullYear(), vardiya_id: '', sablon: 'standart' });
+const sablonlar = [
+    { key: 'standart',          icon: '📋', label: 'Standart (İş Kanunu)',    desc: 'Pzt-Cuma iş, Cmt+Paz tatil',    color: 'bg-blue-50 border-blue-300 hover:bg-blue-100' },
+    { key: 'cumartesi_calisma', icon: '🏭', label: 'Cumartesi Çalışma',       desc: 'Pzt-Cmt iş, Paz tatil',          color: 'bg-amber-50 border-amber-300 hover:bg-amber-100' },
+    { key: 'market',            icon: '🛒', label: 'Market / Perakende',       desc: 'Sal-Paz iş, Pazartesi tatil',     color: 'bg-green-50 border-green-300 hover:bg-green-100' },
+    { key: 'restoran',          icon: '🍽️', label: 'Restoran / Kafe',          desc: 'Çar-Pzt iş, Salı tatil',          color: 'bg-orange-50 border-orange-300 hover:bg-orange-100' },
+    { key: 'surekli',           icon: '🔄', label: '7/7 Sürekli Çalışma',      desc: 'Her gün iş günü (tatil yok)',     color: 'bg-red-50 border-red-300 hover:bg-red-100' },
+];
 
 // --- Grup İşlemleri ---
 const selectGrup = async (g, i) => {
@@ -152,21 +159,19 @@ const aiPlanOlustur = async () => {
         const res = await axios.post(route('tanim.calisma-plani.ai-plan', selectedGrup.value.id), {
             yil: aiForm.value.yil,
             vardiya_id: aiForm.value.vardiya_id || null,
+            sablon: aiForm.value.sablon,
         });
         showAiModal.value = false;
         seciliYil.value   = aiForm.value.yil;
         await planYukle(selectedGrup.value.id);
-
-        const tatilListesi = res.data.tatiller?.join('<br>') || '';
         Swal.fire({
-            title  : `✅ AI Plan Oluşturuldu!`,
-            html   : `<b>${res.data.olusturulan}</b> gün planlandı.<br><b>${res.data.tatil_sayisi}</b> resmi tatil işaretlendi.<br><br>
-                     <div style="text-align:left;font-size:11px;background:#f3f4f6;padding:10px;border-radius:6px;max-height:200px;overflow-y:auto">${tatilListesi}</div>`,
-            icon   : 'success',
+            title: '✅ Plan Oluşturuldu!',
+            html: res.data.message,
+            icon: 'success',
             confirmButtonText: 'Tamam',
         });
     } catch (err) {
-        const msg = err.response?.data?.error || 'AI plan oluşturma başarısız.';
+        const msg = err.response?.data?.error || 'Plan oluşturma başarısız.';
         Swal.fire('Hata', msg, 'error');
     } finally {
         isAiLoading.value = false;
@@ -413,45 +418,53 @@ const turTextClass = (tur) => ({
     </div>
 </div>
 
-<!-- AI Plan Modal -->
+<!-- Plan Şablonları Modal -->
 <div v-if="showAiModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-    <div class="bg-white rounded-lg shadow-xl w-[420px] p-5 border border-purple-200">
+    <div class="bg-white rounded-lg shadow-xl w-[520px] p-5 border border-purple-200">
         <h3 class="font-bold text-sm text-gray-800 mb-1 flex items-center gap-1.5">
-            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 01-2-2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2h-2"></path></svg>
-            AI ile Otomatik Plan Oluştur
+            <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+            Çalışma Planı Şablonu Seç
         </h3>
-        <p class="text-[11px] text-gray-500 mb-4">OpenAI GPT-4o Mini, Türkiye resmi tatillerini hesaplayarak tüm yılı otomatik planlar.</p>
+        <p class="text-[11px] text-gray-500 mb-3">Resmi tatiller otomatik işaretlenir. Şablon seçip yılı belirleyin.</p>
 
-        <div class="bg-purple-50 border border-purple-200 rounded p-3 mb-4 text-[11px] text-purple-700">
-            <div>📅 <b>Hafta içi</b> → Seçilen vardiya → İş Günü</div>
-            <div>🟠 <b>Hafta sonu</b> → Boş → Tatil</div>
-            <div>🔴 <b>Resmi tatil</b> → Boş → Resmi Tatil (AI hesaplar)</div>
+        <!-- Şablon Kartları -->
+        <div class="grid grid-cols-1 gap-2 mb-4">
+            <button v-for="s in sablonlar" :key="s.key" @click="aiForm.sablon = s.key"
+                :class="[s.color, aiForm.sablon === s.key ? 'ring-2 ring-purple-500 shadow-md' : 'opacity-80']"
+                class="flex items-center gap-3 p-2.5 rounded-lg border text-left transition cursor-pointer">
+                <span class="text-xl">{{ s.icon }}</span>
+                <div>
+                    <div class="text-xs font-bold text-gray-800">{{ s.label }}</div>
+                    <div class="text-[10px] text-gray-500">{{ s.desc }}</div>
+                </div>
+                <svg v-if="aiForm.sablon === s.key" class="w-5 h-5 text-purple-600 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+            </button>
         </div>
 
-        <div class="space-y-3">
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="text-[10px] font-semibold text-gray-500 block mb-0.5">Yıl</label>
-                    <select v-model="aiForm.yil" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
-                        <option v-for="y in [2024,2025,2026,2027]" :key="y" :value="y">{{ y }}</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="text-[10px] font-semibold text-gray-500 block mb-0.5">Hafta İçi Varsayılan Vardiya</label>
-                    <select v-model="aiForm.vardiya_id" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
-                        <option value="">— Seçiniz —</option>
-                        <option v-for="v in vardiyalar" :key="v.id" :value="v.id">{{ v.ad }}</option>
-                    </select>
-                </div>
+        <div class="grid grid-cols-2 gap-3 mb-4">
+            <div>
+                <label class="text-[10px] font-semibold text-gray-500 block mb-0.5">Yıl</label>
+                <select v-model="aiForm.yil" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    <option v-for="y in [2024,2025,2026,2027,2028]" :key="y" :value="y">{{ y }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="text-[10px] font-semibold text-gray-500 block mb-0.5">İş Günü Varsayılan Vardiya</label>
+                <select v-model="aiForm.vardiya_id" class="w-full border border-gray-300 rounded px-2 py-1.5 text-xs">
+                    <option value="">— Seçiniz —</option>
+                    <option v-for="v in vardiyalar" :key="v.id" :value="v.id">{{ v.ad }}</option>
+                </select>
             </div>
         </div>
 
-        <div class="flex justify-end gap-2 mt-5">
+        <div class="flex justify-end gap-2">
             <button @click="showAiModal = false" :disabled="isAiLoading" class="text-xs px-4 py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50">İptal</button>
             <button @click="aiPlanOlustur" :disabled="isAiLoading"
                 class="text-xs px-4 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded shadow flex items-center gap-1.5 disabled:opacity-70">
                 <svg v-if="isAiLoading" class="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                {{ isAiLoading ? 'AI Çalışıyor...' : '🤖 Planı Oluştur' }}
+                {{ isAiLoading ? 'Oluşturuluyor...' : '📋 Planı Oluştur' }}
             </button>
         </div>
     </div>

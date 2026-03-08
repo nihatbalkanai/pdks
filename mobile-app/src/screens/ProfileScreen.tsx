@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, Keyboard } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../services/api';
 
@@ -47,7 +47,7 @@ export default function ProfileScreen({ user, firma, onLogout }: { user: any; fi
     ];
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }}>
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
             <Text style={styles.header}>👤 Profilim</Text>
 
             {/* Avatar */}
@@ -82,8 +82,8 @@ export default function ProfileScreen({ user, firma, onLogout }: { user: any; fi
 
             {showSifreDegistir && (
                 <View style={styles.sifreForm}>
-                    <TextInput style={styles.sifreInput} placeholder="Mevcut Şifre" secureTextEntry value={mevcutSifre} onChangeText={setMevcutSifre} placeholderTextColor="#6B5B8D" />
-                    <TextInput style={styles.sifreInput} placeholder="Yeni Şifre (min 6 karakter)" secureTextEntry value={yeniSifre} onChangeText={setYeniSifre} placeholderTextColor="#6B5B8D" />
+                    <TextInput style={styles.sifreInput} placeholder="Mevcut Şifre" secureTextEntry value={mevcutSifre} onChangeText={setMevcutSifre} placeholderTextColor="#6B5B8D" returnKeyType="next" />
+                    <TextInput style={styles.sifreInput} placeholder="Yeni Şifre (min 6 karakter)" secureTextEntry value={yeniSifre} onChangeText={setYeniSifre} placeholderTextColor="#6B5B8D" returnKeyType="done" onSubmitEditing={() => { Keyboard.dismiss(); handleSifreDegistir(); }} />
                     <TouchableOpacity style={styles.sifreBtn} onPress={handleSifreDegistir}>
                         <Text style={styles.sifreBtnText}>Şifreyi Güncelle</Text>
                     </TouchableOpacity>

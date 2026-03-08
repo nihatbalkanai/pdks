@@ -40,6 +40,10 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+        'personel' => [
+            'driver' => 'session',
+            'provider' => 'personeller',
+        ],
     ],
 
     /*
@@ -65,10 +69,10 @@ return [
             'model' => env('AUTH_MODEL', App\Models\Kullanici::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'kullanicilar',
-        // ],
+        'personeller' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Personel::class,
+        ],
     ],
 
     /*

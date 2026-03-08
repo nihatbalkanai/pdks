@@ -60,7 +60,7 @@ class PersonelCalismaPlanController extends Controller
     public function gunGuncelle(Request $request, $personelId)
     {
         $validated = $request->validate([
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'vardiya_id' => 'nullable|integer',
             'tur' => 'required|string',
             'aciklama' => 'nullable|string|max:255',
@@ -129,8 +129,8 @@ class PersonelCalismaPlanController extends Controller
     public function topluAta(Request $request, $personelId)
     {
         $validated = $request->validate([
-            'baslangic' => 'required|date',
-            'bitis' => 'required|date|after_or_equal:baslangic',
+            'baslangic' => 'required|date|after:2000-01-01|before:2100-01-01',
+            'bitis' => 'required|date|before:2100-01-01|after_or_equal:baslangic',
             'gunler' => 'required|array', // [1,2,3,4,5] pazartesi-cuma
             'vardiya_id' => 'nullable|integer',
             'tur' => 'required|string',

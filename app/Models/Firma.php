@@ -31,6 +31,7 @@ class Firma extends Model
         'qr_kod_aktif',
         'gps_zorunlu',
         'selfie_zorunlu',
+        'logo_yolu',
     ];
 
     protected $casts = [

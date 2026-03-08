@@ -16,7 +16,7 @@ class MesaiController extends Controller
     {
         $validated = $request->validate([
             'personel_id'           => 'required|integer',
-            'tarih'                 => 'required|date',
+            'tarih'                 => 'required|date|after:2000-01-01|before:2100-01-01',
             'ilk_giris'             => 'nullable|string',
             'son_cikis'             => 'nullable|string',
             'toplam_calisma_suresi' => 'required|integer|min:0',

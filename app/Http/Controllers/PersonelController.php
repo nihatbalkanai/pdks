@@ -65,6 +65,16 @@ class PersonelController extends Controller
             ->orderBy('ad')
             ->get(['id', 'ad', 'baslangic_saati', 'bitis_saati', 'toplam_sure']);
 
+        // Çalışma grupları
+        $calismaGruplari = \App\Models\CalismaGrubu::withoutGlobalScopes()
+            ->where('firma_id', $firma_id)
+            ->where('durum', true)
+            ->orderBy('aciklama')
+            ->get(['id', 'aciklama']);
+
+        // Firma kodu (mobil giriş için)
+        $firma = \App\Models\Firma::find($firma_id);
+
         return Inertia::render('Personel/Index', [
             'personeller' => $personeller,
             'filtreler' => $request->only(['arama']),
@@ -73,6 +83,8 @@ class PersonelController extends Controller
             'gunlukPuantajParametreleri' => $gunlukPuantajParametreleri,
             'subeler' => $subeler,
             'vardiyalar' => $vardiyalar,
+            'calismaGruplari' => $calismaGruplari,
+            'firmaKodu' => $firma->firma_kodu ?? '',
         ]);
     }
 
@@ -347,6 +359,8 @@ class PersonelController extends Controller
             'ulasim_tipi' => 'nullable|in:servis,yol_parasi_gunluk,yol_parasi_aylik',
             'servis_plaka' => 'nullable|string|max:20',
             'yol_parasi' => 'nullable|numeric|min:0',
+            'calisma_grubu_id' => 'nullable|exists:calisma_gruplari,id',
+            'mobil_sifre_yeni' => 'nullable|string|min:4|max:20',
         ]);
 
             $validated['ad_soyad'] = $validated['ad'] . ' ' . $validated['soyad'];
@@ -355,6 +369,12 @@ class PersonelController extends Controller
             if (empty($validated['sicil_no'])) {
                 unset($validated['sicil_no']);
             }
+
+            // Mobil şifre güncelleme (hash'le)
+            if (!empty($validated['mobil_sifre_yeni'])) {
+                $personel->mobil_sifre = \Illuminate\Support\Facades\Hash::make($validated['mobil_sifre_yeni']);
+            }
+            unset($validated['mobil_sifre_yeni']);
 
             $personel->update($validated);
             $personel->refresh();
@@ -425,12 +445,30 @@ class PersonelController extends Controller
     public function pdksEkle(Request $request, $personelId)
     {
         $validated = $request->validate([
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'saat' => 'required|date_format:H:i',
             'islem_tipi' => 'required|in:Giriş,Çıkış',
         ]);
 
         $kayitTarihi = $validated['tarih'] . ' ' . $validated['saat'] . ':00';
+
+        // ═══ YARIM SAAT KURALI ═══
+        $sonKayit = PdksKaydi::withoutGlobalScopes()
+            ->where('personel_id', $personelId)
+            ->orderByDesc('kayit_tarihi')
+            ->first();
+
+        if ($sonKayit) {
+            $sonZaman = \Carbon\Carbon::parse($sonKayit->kayit_tarihi);
+            $yeniZaman = \Carbon\Carbon::parse($kayitTarihi);
+            $farkDakika = abs($yeniZaman->diffInMinutes($sonZaman));
+            if ($farkDakika < 30) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Son kayıtla arasında en az 30 dakika olmalıdır. (Fark: ' . $farkDakika . ' dk)',
+                ], 422);
+            }
+        }
 
         $kayit = PdksKaydi::create([
             'firma_id' => Auth::user()->firma_id ?? 1,
@@ -449,7 +487,7 @@ class PersonelController extends Controller
     public function pdksGuncelle(Request $request, $personelId, $kayitId)
     {
         $validated = $request->validate([
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'saat' => 'required|date_format:H:i',
             'islem_tipi' => 'required|in:Giriş,Çıkış',
         ]);

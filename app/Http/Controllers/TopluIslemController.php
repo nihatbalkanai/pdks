@@ -27,7 +27,7 @@ class TopluIslemController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'tip' => 'required|in:oran,miktar',
             'deger' => 'required|numeric|min:0',
         ]);
@@ -60,8 +60,8 @@ class TopluIslemController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'baslangic_tarihi' => 'required|date',
-            'bitis_tarihi' => 'required|date|after_or_equal:baslangic_tarihi',
+            'baslangic_tarihi' => 'required|date|after:2000-01-01|before:2100-01-01',
+            'bitis_tarihi' => 'required|date|before:2100-01-01|after_or_equal:baslangic_tarihi',
             'giris_saati' => 'nullable|string',
             'cikis_saati' => 'nullable|string',
         ]);
@@ -110,8 +110,8 @@ class TopluIslemController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'baslangic_tarihi' => 'required|date',
-            'bitis_tarihi' => 'required|date|after_or_equal:baslangic_tarihi',
+            'baslangic_tarihi' => 'required|date|after:2000-01-01|before:2100-01-01',
+            'bitis_tarihi' => 'required|date|before:2100-01-01|after_or_equal:baslangic_tarihi',
             'tatil_tipi' => 'required|string',
             'aciklama' => 'nullable|string',
             'saatlik_izin' => 'boolean',
@@ -160,7 +160,7 @@ class TopluIslemController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'tip' => 'required|in:oran,miktar',
             'deger' => 'required|numeric|min:0',
             'aciklama' => 'nullable|string',
@@ -200,7 +200,7 @@ class TopluIslemController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'tip' => 'required|in:oran,miktar',
             'deger' => 'required|numeric|min:0',
             'aciklama' => 'nullable|string',
@@ -352,7 +352,7 @@ class TopluIslemController extends Controller
     public function girisCikisDuzenlemeKaydet(Request $request)
     {
         $request->validate([
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'kayitlar' => 'required|array',
             'kayitlar.*.personel_id' => 'required|integer',
             'kayitlar.*.giris_saati' => 'nullable|string',
@@ -398,7 +398,7 @@ class TopluIslemController extends Controller
 
     public function girisCikisTarihSil(Request $request)
     {
-        $request->validate(['tarih' => 'required|date']);
+        $request->validate(['tarih' => 'required|date|after:2000-01-01|before:2100-01-01']);
 
         $silinen = PdksKaydi::withoutGlobalScopes()
             ->whereDate('kayit_tarihi', $request->tarih)

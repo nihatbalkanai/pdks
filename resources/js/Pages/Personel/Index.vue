@@ -13,6 +13,8 @@ const props = defineProps({
     gunlukPuantajParametreleri: { type: Array, default: () => [] },
     subeler: { type: Array, default: () => [] },
     vardiyalar: { type: Array, default: () => [] },
+    calismaGruplari: { type: Array, default: () => [] },
+    firmaKodu: { type: String, default: '' },
 });
 
 // Tanım kodları helper
@@ -142,6 +144,7 @@ const savePersonel = async () => {
             puantaj_parametre_id: selectedPersonel.value.puantaj_parametre_id || null,
             aylik_puantaj_parametre_id: selectedPersonel.value.aylik_puantaj_parametre_id || null,
             vardiya_id: selectedPersonel.value.vardiya_id || null,
+            calisma_grubu_id: selectedPersonel.value.calisma_grubu_id || null,
             tc_no: selectedPersonel.value.tc_no || null,
             iban_no: selectedPersonel.value.iban_no || null,
             adres: selectedPersonel.value.adres || null,
@@ -153,6 +156,7 @@ const savePersonel = async () => {
             ulasim_tipi: selectedPersonel.value.ulasim_tipi || null,
             servis_plaka: selectedPersonel.value.servis_plaka || null,
             yol_parasi: parseNum(selectedPersonel.value.yol_parasi),
+            mobil_sifre_yeni: selectedPersonel.value.mobil_sifre_yeni || null,
         };
 
         const axiosConfig = {
@@ -849,6 +853,13 @@ const uploadResim = async (event) => {
                                                     </select>
                                                 </div>
                                                 <div class="form-group">
+                                                    <label>Çalışma Grubu</label>
+                                                    <select v-model="selectedPersonel.calisma_grubu_id" class="form-input">
+                                                        <option :value="null">Seçiniz</option>
+                                                        <option v-for="g in props.calismaGruplari" :key="g.id" :value="g.id">{{ g.aciklama }}</option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group">
                                                     <label>Özel Kod</label>
                                                     <select v-model="selectedPersonel.ozel_kod" class="form-input">
                                                         <option value="">Seçiniz</option>
@@ -894,6 +905,16 @@ const uploadResim = async (event) => {
                                                 <div class="form-group"><label>Telefon</label><input v-model="selectedPersonel.telefon" class="form-input" placeholder="05XX XXX XX XX" /></div>
                                                 <div class="form-group"><label>Doğum Tarihi</label><input v-model="selectedPersonel.dogum_tarihi" type="date" class="form-input" /></div>
                                                 <div class="form-group"><label>TC Kimlik No</label><input v-model="selectedPersonel.tc_no" class="form-input" maxlength="11" placeholder="11 haneli TC No" @blur="tcNoDogrula" /></div>
+                                                <div class="form-group">
+                                                    <label>Mobil Firma Kodu</label>
+                                                    <input :value="props.firmaKodu" class="form-input bg-gray-100 font-bold text-indigo-700" readonly />
+                                                    <span class="text-[9px] text-gray-400">Mobil girişte kullanılır</span>
+                                                </div>
+                                                <div class="form-group">
+                                                    <label>Mobil Şifre</label>
+                                                    <input v-model="selectedPersonel.mobil_sifre_yeni" type="text" class="form-input" placeholder="Varsayılan: TC son 6 hane" />
+                                                    <span class="text-[9px] text-gray-400">Boş bırakılırsa mevcut şifre korunur</span>
+                                                </div>
                                                 <div class="form-group"><label>IBAN No</label><input v-model="selectedPersonel.iban_no" class="form-input" maxlength="34" placeholder="TR..." @blur="ibanDogrula" /></div>
                                                 <div class="form-group"><label>Acil Kişi Adı</label><input v-model="selectedPersonel.acil_kisi_adi" class="form-input" placeholder="İsim Soyisim" /></div>
                                                 <div class="form-group"><label>Acil Kişi Tel.</label><input v-model="selectedPersonel.acil_kisi_telefonu" class="form-input" placeholder="05XX XXX XX XX" /></div>

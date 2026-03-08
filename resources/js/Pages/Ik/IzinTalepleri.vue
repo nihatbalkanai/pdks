@@ -105,8 +105,8 @@ const islem = async (id, durum) => {
                     </select>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <div><label class="block text-xs font-semibold text-gray-700 mb-1">Başlangıç *</label><input v-model="form.baslangic_tarihi" type="date" required class="w-full border-gray-300 rounded text-sm" /></div>
-                    <div><label class="block text-xs font-semibold text-gray-700 mb-1">Bitiş *</label><input v-model="form.bitis_tarihi" type="date" required class="w-full border-gray-300 rounded text-sm" /></div>
+                    <div><label class="block text-xs font-semibold text-gray-700 mb-1">Başlangıç *</label><input v-model="form.baslangic_tarihi" type="date" required min="2000-01-01" max="2099-12-31" class="w-full border-gray-300 rounded text-sm" /></div>
+                    <div><label class="block text-xs font-semibold text-gray-700 mb-1">Bitiş *</label><input v-model="form.bitis_tarihi" type="date" required min="2000-01-01" max="2099-12-31" class="w-full border-gray-300 rounded text-sm" /></div>
                 </div>
                 <div><label class="block text-xs font-semibold text-gray-700 mb-1">Açıklama</label><textarea v-model="form.aciklama" rows="2" class="w-full border-gray-300 rounded text-sm" placeholder="İsteğe bağlı açıklama..."></textarea></div>
                 <div class="flex justify-end gap-2"><button type="button" @click="isModalOpen = false" class="px-4 py-2 bg-gray-200 rounded text-sm">İptal</button><button type="submit" class="px-4 py-2 bg-teal-600 text-white rounded text-sm font-semibold hover:bg-teal-700">Oluştur</button></div>

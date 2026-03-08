@@ -14,13 +14,24 @@ class FirmaScope implements Scope
      */
     public function apply(Builder $builder, Model $model): void
     {
-        // Eğer kullanıcı giriş yapmışsa ve sistem admini değilse
-        if (Auth::hasUser() && Auth::user()->rol !== 'admin') {
-            $builder->where($model->getTable() . '.firma_id', Auth::user()->firma_id);
-            
-            // Kullanıcı sadece şube müdürü ise ve tabloda sube_id varsa (fillable içindeyse veya model methodu varsa)
-            if (Auth::user()->rol === 'sube_muduru' && in_array('sube_id', $model->getFillable())) {
-                $builder->where($model->getTable() . '.sube_id', Auth::user()->sube_id);
+        // Eğer kullanıcı giriş yapmışsa
+        if (Auth::hasUser()) {
+            $user = Auth::user();
+
+            // Mobil API: Personel modeli ile giriş yapılmışsa
+            if ($user instanceof \App\Models\Personel) {
+                $builder->where($model->getTable() . '.firma_id', $user->firma_id);
+                return;
+            }
+
+            // Web Panel: Kullanıcı modeli ile giriş yapılmışsa
+            if ($user->rol !== 'admin') {
+                $builder->where($model->getTable() . '.firma_id', $user->firma_id);
+
+                // Kullanıcı sadece şube müdürü ise
+                if ($user->rol === 'sube_muduru' && in_array('sube_id', $model->getFillable())) {
+                    $builder->where($model->getTable() . '.sube_id', $user->sube_id);
+                }
             }
         }
     }

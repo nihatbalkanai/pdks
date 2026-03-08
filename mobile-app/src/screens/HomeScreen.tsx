@@ -88,7 +88,9 @@ export default function HomeScreen({ user, firma, onLogout }: { user: any; firma
             <View style={styles.topBar}>
                 <View style={styles.userInfoBlock}>
                     {firma?.logo ? (
-                        <Image source={{ uri: firma.logo }} style={styles.firmaLogo} resizeMode="contain" />
+                        <View style={styles.logoBox}>
+                            <Image source={{ uri: firma.logo }} style={styles.firmaLogo} resizeMode="contain" />
+                        </View>
                     ) : (
                         <View style={styles.logoFallback}>
                             <Ionicons name="business" size={24} color="#7C3AED" />
@@ -180,7 +182,8 @@ const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#0F0A1E', paddingHorizontal: 20, paddingTop: 50 },
     topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
     userInfoBlock: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    firmaLogo: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#fff' },
+    logoBox: { backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4 },
+    firmaLogo: { width: 36, height: 32 },
     logoFallback: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#2D1B3E', justifyContent: 'center', alignItems: 'center' },
     greeting: { color: '#A78BFA', fontSize: 13 },
     userName: { color: '#fff', fontSize: 18, fontWeight: '800' },

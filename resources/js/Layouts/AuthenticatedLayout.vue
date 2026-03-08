@@ -168,10 +168,10 @@ onUnmounted(() => {
                     <DropdownLink :href="route('tanim.calisma-plani.index')">Genel Gruplar Çalışma Planı</DropdownLink>
                     <DropdownLink :href="route('tanim.puantaj-parametreleri.index')">Aylık Puantaj Parametreleri</DropdownLink>
                     <DropdownLink :href="route('tanim.tatil-izin.index')">Tatil ve İzin Tanımlamaları</DropdownLink>
-                    <DropdownLink :href="route('tanim.gunluk-puantaj.index')">Günlük Puantaj Parametreleri</DropdownLink>
-                    <DropdownLink :href="route('tanim.bordro-alanlari.index')">Bordro Alanı Tanımlamaları</DropdownLink>
+                    <DropdownLink :href="route('tanim.gunluk-puantaj.index')">Günlük Puantaj Param.</DropdownLink>
+                    <DropdownLink :href="route('tanim.bordro-alanlari.index')">Bordro Alanı Tanımları</DropdownLink>
                     <DropdownLink :href="route('tanim.vardiyalar.index')">Vardiya Tanımları</DropdownLink>
-                    <DropdownLink :href="route('tanim.personel-calisma-plan.index')">Personele Özel Çalışma Planları</DropdownLink>
+                    <DropdownLink :href="route('tanim.personel-calisma-plan.index')">Personel Çalışma Planları</DropdownLink>
                     <DropdownLink :href="route('tanim.personel-izin.index')">Personel İzin Yönetimi</DropdownLink>
                 </template>
             </Dropdown>
@@ -493,11 +493,11 @@ onUnmounted(() => {
                         </Link>
                         <Link :href="route('tanim.gunluk-puantaj.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('tanim.gunluk-puantaj.index')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                            Günlük Puantaj Parametreleri
+                            Günlük Puantaj Param.
                         </Link>
                         <Link :href="route('tanim.bordro-alanlari.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('tanim.bordro-alanlari.index')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
-                            Bordro Alanı Tanımlamaları
+                            Bordro Alanı Tanımları
                         </Link>
                         <Link :href="route('tanim.vardiyalar.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('tanim.vardiyalar.index')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
@@ -505,7 +505,7 @@ onUnmounted(() => {
                         </Link>
                         <Link :href="route('tanim.personel-calisma-plan.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('tanim.personel-calisma-plan.index')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                            Personele Özel Çalışma Planları
+                            Personel Çalışma Planları
                         </Link>
                         <Link :href="route('tanim.personel-izin.index')" class="sidebar-item" :class="{'sidebar-item-active': route().current('tanim.personel-izin.index')}">
                             <svg class="w-3.5 h-3.5 mr-1.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>

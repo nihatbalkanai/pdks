@@ -69,10 +69,67 @@ class MobilBaglantiController extends Controller
         $firma = Firma::find(Auth::user()->firma_id);
 
         if ($request->hasFile('logo')) {
+            // Eski logoyu sil
             if ($firma->logo_yolu && Storage::disk('public')->exists($firma->logo_yolu)) {
                 Storage::disk('public')->delete($firma->logo_yolu);
             }
-            $v['logo_yolu'] = $request->file('logo')->store('firmalar/logolar', 'public');
+
+            // Resize & compress (max 300x300, JPEG kalite 80)
+            $file = $request->file('logo');
+            $img = null;
+            $ext = strtolower($file->getClientOriginalExtension());
+
+            if (in_array($ext, ['jpg', 'jpeg'])) $img = @imagecreatefromjpeg($file->getPathname());
+            elseif ($ext === 'png') $img = @imagecreatefrompng($file->getPathname());
+            elseif ($ext === 'gif') $img = @imagecreatefromgif($file->getPathname());
+            elseif ($ext === 'webp') $img = @imagecreatefromwebp($file->getPathname());
+
+            if ($img) {
+                $w = imagesx($img);
+                $h = imagesy($img);
+                $maxDim = 300;
+
+                if ($w > $maxDim || $h > $maxDim) {
+                    $ratio = min($maxDim / $w, $maxDim / $h);
+                    $newW = (int)($w * $ratio);
+                    $newH = (int)($h * $ratio);
+                    $resized = imagecreatetruecolor($newW, $newH);
+
+                    // PNG/GIF şeffaflık desteği
+                    if (in_array($ext, ['png', 'gif'])) {
+                        imagealphablending($resized, false);
+                        imagesavealpha($resized, true);
+                        $transparent = imagecolorallocatealpha($resized, 255, 255, 255, 127);
+                        imagefilledrectangle($resized, 0, 0, $newW, $newH, $transparent);
+                    }
+
+                    imagecopyresampled($resized, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
+                    imagedestroy($img);
+                    $img = $resized;
+                }
+
+                // Dosya adı
+                $filename = 'firmalar/logolar/' . Str::random(20);
+
+                // PNG ise PNG olarak kaydet, diğerleri JPEG
+                if (in_array($ext, ['png'])) {
+                    $filename .= '.png';
+                    $tmpPath = sys_get_temp_dir() . '/' . Str::random(10) . '.png';
+                    imagepng($img, $tmpPath, 8); // compression level 8
+                } else {
+                    $filename .= '.jpg';
+                    $tmpPath = sys_get_temp_dir() . '/' . Str::random(10) . '.jpg';
+                    imagejpeg($img, $tmpPath, 80); // quality 80
+                }
+                imagedestroy($img);
+
+                Storage::disk('public')->put($filename, file_get_contents($tmpPath));
+                unlink($tmpPath);
+                $v['logo_yolu'] = $filename;
+            } else {
+                // GD başarısızsa orijinal dosyayı kaydet
+                $v['logo_yolu'] = $file->store('firmalar/logolar', 'public');
+            }
         }
 
         unset($v['logo']); // We only store logo_yolu in DB, remove the file obj from array

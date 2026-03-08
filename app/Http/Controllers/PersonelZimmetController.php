@@ -18,7 +18,7 @@ class PersonelZimmetController extends Controller
             'kategori'        => 'required|string|max:255',
             'bolum_adi'       => 'nullable|string|max:255',
             'aciklama'        => 'required|string|max:255',
-            'verilis_tarihi'  => 'required|date',
+            'verilis_tarihi'  => 'required|date|after:2000-01-01|before:2100-01-01',
             'iade_tarihi'     => 'nullable|date|after_or_equal:verilis_tarihi',
         ]);
 
@@ -46,7 +46,7 @@ class PersonelZimmetController extends Controller
             'kategori'        => 'required|string|max:255',
             'bolum_adi'       => 'nullable|string|max:255',
             'aciklama'        => 'required|string|max:255',
-            'verilis_tarihi'  => 'required|date',
+            'verilis_tarihi'  => 'required|date|after:2000-01-01|before:2100-01-01',
             'iade_tarihi'     => 'nullable|date',
         ]);
 

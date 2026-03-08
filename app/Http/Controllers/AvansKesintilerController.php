@@ -61,7 +61,7 @@ class AvansKesintilerController extends Controller
     {
         $validated = $request->validate([
             'personel_id' => 'required|exists:personeller,id',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'tutar' => 'required|numeric',
             'aciklama' => 'nullable|string',
             'bordro_alani' => 'required|string',
@@ -151,7 +151,7 @@ class AvansKesintilerController extends Controller
     {
         $validated = $request->validate([
             'personel_id' => 'required|exists:personeller,id',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'tutar' => 'required|numeric',
             'aciklama' => 'nullable|string',
             'bordro_alani' => 'required|string',

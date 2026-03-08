@@ -119,7 +119,7 @@ class MobilAppController extends Controller
             'firma' => [
                 'id' => $firma->id,
                 'firma_adi' => $firma->firma_adi,
-                'logo' => $firma->logo_yolu ? asset('storage/'.$firma->logo_yolu) : null,
+                'logo' => $firma->logo_yolu ? request()->getSchemeAndHttpHost() . '/storage/' . $firma->logo_yolu : null,
                 'gps_zorunlu' => $firma->gps_zorunlu,
                 'qr_kod_aktif' => $firma->qr_kod_aktif,
                 'geofence_yaricap' => $firma->geofence_yaricap,
@@ -147,6 +147,26 @@ class MobilAppController extends Controller
 
         if (!$firma || !$firma->mobil_giris_aktif) {
             return response()->json(['hata' => true, 'mesaj' => 'Mobil giriş bu firma için aktif değil.'], 403);
+        }
+
+        // ═══ YARIM SAAT KURALI ═══
+        // Son işlemden en az 30 dakika geçmeli
+        $sonKayit = PdksKaydi::withoutGlobalScopes()
+            ->where('personel_id', $personel->id)
+            ->where('firma_id', $firma->id)
+            ->orderByDesc('kayit_tarihi')
+            ->first();
+
+        if ($sonKayit) {
+            $sonZaman = Carbon::parse($sonKayit->kayit_tarihi);
+            $farkDakika = now()->diffInMinutes($sonZaman);
+            if ($farkDakika < 30) {
+                $kalanDk = 30 - $farkDakika;
+                return response()->json([
+                    'hata' => true,
+                    'mesaj' => "Son işleminizin üzerinden henüz 30 dakika geçmedi. {$kalanDk} dakika sonra tekrar deneyiniz.",
+                ], 429);
+            }
         }
 
         $mesafe = null;
@@ -407,11 +427,313 @@ class MobilAppController extends Controller
      */
     private function mesafeHesapla($lat1, $lon1, $lat2, $lon2): int
     {
-        $R = 6371000; // Dünya yarıçapı (metre)
+        $R = 6371000;
         $dLat = deg2rad($lat2 - $lat1);
         $dLon = deg2rad($lon2 - $lon1);
         $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) ** 2;
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
         return (int) round($R * $c);
+    }
+
+    // ═══════════════════ YENİ MODÜLLER ═══════════════════
+
+    /**
+     * İzinlerim — Personelin izin listesi
+     */
+    public function izinlerim(Request $request)
+    {
+        $personel = $request->user();
+        $izinler = \App\Models\PersonelIzin::withoutGlobalScopes()
+            ->with('izinTuru')
+            ->where('personel_id', $personel->id)
+            ->orderByDesc('tarih')
+            ->limit(50)
+            ->get()
+            ->map(fn($iz) => [
+                'id' => $iz->id,
+                'tarih' => Carbon::parse($iz->tarih)->format('d.m.Y'),
+                'bitis' => $iz->bitis_tarihi ? Carbon::parse($iz->bitis_tarihi)->format('d.m.Y') : null,
+                'gun' => $iz->bitis_tarihi
+                    ? Carbon::parse($iz->tarih)->diffInDays(Carbon::parse($iz->bitis_tarihi)) + 1
+                    : 1,
+                'tur' => $iz->izinTuru?->ad ?? 'Bilinmiyor',
+                'durum' => $iz->durum, // beklemede, onaylandi, reddedildi
+                'aciklama' => $iz->aciklama,
+            ]);
+
+        return response()->json(['hata' => false, 'izinler' => $izinler]);
+    }
+
+    /**
+     * İzin Talebi Oluştur
+     */
+    public function izinTalebi(Request $request)
+    {
+        $request->validate([
+            'izin_turu_id' => 'required|exists:izin_turleri,id',
+            'tarih' => 'required|date|after:yesterday',
+            'bitis_tarihi' => 'nullable|date|after_or_equal:tarih',
+            'baslangic_saati' => 'nullable|string|max:5',
+            'bitis_saati' => 'nullable|string|max:5',
+            'aciklama' => 'nullable|string|max:500',
+        ]);
+
+        $personel = $request->user();
+
+        // Saatlik izin bilgisini açıklamaya ekle
+        $aciklama = $request->aciklama ?? '';
+        if ($request->baslangic_saati && $request->bitis_saati) {
+            $saatBilgisi = "⏰ Saatlik İzin: {$request->baslangic_saati} - {$request->bitis_saati}";
+            $aciklama = $saatBilgisi . ($aciklama ? " | {$aciklama}" : '');
+        }
+
+        $izin = \App\Models\PersonelIzin::create([
+            'firma_id' => $personel->firma_id,
+            'personel_id' => $personel->id,
+            'izin_turu_id' => $request->izin_turu_id,
+            'tarih' => $request->tarih,
+            'bitis_tarihi' => $request->bitis_tarihi ?? $request->tarih,
+            'aciklama' => $aciklama,
+            'durum' => 'beklemede',
+        ]);
+
+        $mesajTip = ($request->baslangic_saati && $request->bitis_saati)
+            ? "Saatlik izin talebiniz ({$request->baslangic_saati}-{$request->bitis_saati}) oluşturuldu."
+            : 'İzin talebiniz oluşturuldu. Yönetici onayı bekleniyor.';
+
+        return response()->json([
+            'hata' => false,
+            'mesaj' => $mesajTip,
+        ]);
+    }
+
+    /**
+     * İzin Türleri Listesi
+     */
+    public function izinTurleri(Request $request)
+    {
+        $personel = $request->user();
+        $turler = \App\Models\IzinTuru::withoutGlobalScopes()
+            ->where('firma_id', $personel->firma_id)
+            ->select('id', 'ad')
+            ->orderBy('ad')
+            ->get();
+
+        return response()->json(['hata' => false, 'turler' => $turler]);
+    }
+
+    /**
+     * Puantaj Özeti — Bu ay çalışma istatistikleri
+     */
+    public function puantajOzeti(Request $request)
+    {
+        $personel = $request->user();
+        $ay = $request->ay ?? now()->month;
+        $yil = $request->yil ?? now()->year;
+
+        $baslangic = Carbon::create($yil, $ay, 1)->startOfMonth();
+        $bitis = $baslangic->copy()->endOfMonth();
+        $bugun = now();
+
+        // PDKS kayıtları
+        $kayitlar = PdksKaydi::withoutGlobalScopes()
+            ->where('personel_id', $personel->id)
+            ->whereBetween('kayit_tarihi', [$baslangic, $bitis])
+            ->orderBy('kayit_tarihi')
+            ->get();
+
+        // Günlere göre grupla
+        $gunler = $kayitlar->groupBy(fn($k) => Carbon::parse($k->kayit_tarihi)->format('Y-m-d'));
+
+        $gelinenGun = 0;
+        $toplamDakika = 0;
+
+        foreach ($gunler as $tarih => $gunKayitlari) {
+            $ilk = $gunKayitlari->first();
+            $son = $gunKayitlari->last();
+            if ($ilk && $son && $ilk->id !== $son->id) {
+                $dakika = Carbon::parse($ilk->kayit_tarihi)->diffInMinutes(Carbon::parse($son->kayit_tarihi));
+                $toplamDakika += $dakika;
+            }
+            $gelinenGun++;
+        }
+
+        // İzin sayıları
+        $izinler = \App\Models\PersonelIzin::withoutGlobalScopes()
+            ->with('izinTuru')
+            ->where('personel_id', $personel->id)
+            ->where('durum', 'onaylandi')
+            ->where(function ($q) use ($baslangic, $bitis) {
+                $q->whereBetween('tarih', [$baslangic, $bitis]);
+            })->get();
+
+        $ucretliIzin = 0;
+        $ucretsizIzin = 0;
+        $raporGun = 0;
+        foreach ($izinler as $iz) {
+            $gun = $iz->bitis_tarihi
+                ? Carbon::parse($iz->tarih)->diffInDays(Carbon::parse($iz->bitis_tarihi)) + 1
+                : 1;
+            $turAd = mb_strtolower($iz->izinTuru?->ad ?? '');
+            if (str_contains($turAd, 'rapor')) {
+                $raporGun += $gun;
+            } elseif ($iz->izinTuru?->ucret_kesintisi_yapilacak_mi) {
+                $ucretsizIzin += $gun;
+            } else {
+                $ucretliIzin += $gun;
+            }
+        }
+
+        // Resmi tatiller
+        $resmiTatilSayisi = \App\Models\ResmiTatil::withoutGlobalScopes()
+            ->where('firma_id', $personel->firma_id)
+            ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
+            ->count();
+
+        return response()->json([
+            'hata' => false,
+            'ozet' => [
+                'ay' => $baslangic->translatedFormat('F Y'),
+                'gelinen_gun' => $gelinenGun,
+                'toplam_saat' => round($toplamDakika / 60, 1),
+                'toplam_dakika' => $toplamDakika,
+                'ucretli_izin' => $ucretliIzin,
+                'ucretsiz_izin' => $ucretsizIzin,
+                'rapor_gun' => $raporGun,
+                'resmi_tatil' => $resmiTatilSayisi,
+                'takvim_gunu' => $bitis->day,
+            ],
+        ]);
+    }
+
+    /**
+     * Vardiya Takvimi — Bu ay vardiya planı
+     */
+    public function vardiyaTakvimi(Request $request)
+    {
+        $personel = $request->user();
+        $ay = $request->ay ?? now()->month;
+        $yil = $request->yil ?? now()->year;
+
+        $baslangic = Carbon::create($yil, $ay, 1)->startOfMonth();
+        $bitis = $baslangic->copy()->endOfMonth();
+
+        // Personele özel plan
+        $planlar = \App\Models\PersonelCalismaPlan::withoutGlobalScopes()
+            ->with('vardiya')
+            ->where('personel_id', $personel->id)
+            ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
+            ->get()
+            ->keyBy(fn($p) => Carbon::parse($p->tarih)->format('Y-m-d'));
+
+        // Grup planı (fallback)
+        $grupPlan = collect();
+        if ($personel->calisma_grubu_id) {
+            $grupPlan = \App\Models\CalismaPlan::withoutGlobalScopes()
+                ->with('vardiya')
+                ->where('calisma_grubu_id', $personel->calisma_grubu_id)
+                ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
+                ->get()
+                ->keyBy(fn($p) => Carbon::parse($p->tarih)->format('Y-m-d'));
+        }
+
+        // Resmi tatiller
+        $resmiTatiller = \App\Models\ResmiTatil::withoutGlobalScopes()
+            ->where('firma_id', $personel->firma_id)
+            ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
+            ->pluck('ad', 'tarih')
+            ->mapWithKeys(fn($ad, $t) => [Carbon::parse($t)->format('Y-m-d') => $ad]);
+
+        $takvim = [];
+        for ($d = $baslangic->copy(); $d->lte($bitis); $d->addDay()) {
+            $t = $d->format('Y-m-d');
+            $plan = $planlar[$t] ?? $grupPlan[$t] ?? null;
+            $tatilAdi = $resmiTatiller[$t] ?? null;
+
+            $takvim[] = [
+                'tarih' => $d->format('d'),
+                'gun' => $d->translatedFormat('D'),
+                'tur' => $tatilAdi ? 'resmi_tatil' : ($plan?->tur ?? ($d->isWeekend() ? 'tatil' : 'is_gunu')),
+                'vardiya' => $plan?->vardiya?->ad ?? null,
+                'tatil_adi' => $tatilAdi,
+            ];
+        }
+
+        return response()->json([
+            'hata' => false,
+            'ay' => $baslangic->translatedFormat('F Y'),
+            'takvim' => $takvim,
+        ]);
+    }
+
+    /**
+     * Belgelerim — Personelin dosyaları
+     */
+    public function belgelerim(Request $request)
+    {
+        $personel = $request->user();
+
+        try {
+            $dosyalar = \App\Models\PersonelDosya::withoutGlobalScopes()
+                ->where('personel_id', $personel->id)
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn($d) => [
+                    'id' => $d->id,
+                    'ad' => $d->dosya_adi ?? $d->ad ?? 'Belge',
+                    'tur' => $d->dosya_turu ?? $d->tur ?? 'Diğer',
+                    'tarih' => Carbon::parse($d->created_at)->format('d.m.Y'),
+                    'url' => $d->dosya_yolu ? asset('storage/' . $d->dosya_yolu) : null,
+                ]);
+        } catch (\Exception $e) {
+            $dosyalar = [];
+        }
+
+        return response()->json(['hata' => false, 'belgeler' => $dosyalar]);
+    }
+
+    /**
+     * Bordro Özeti — Son ay bordro bilgisi
+     */
+    public function bordroOzeti(Request $request)
+    {
+        $personel = $request->user();
+        $ay = $request->ay ?? now()->month;
+        $yil = $request->yil ?? now()->year;
+
+        try {
+            $puantaj = DB::table('puantaj_sonuclari')
+                ->where('personel_id', $personel->id)
+                ->where('ay', $ay)
+                ->where('yil', $yil)
+                ->first();
+        } catch (\Exception $e) {
+            $puantaj = null;
+        }
+
+        if (!$puantaj) {
+            return response()->json([
+                'hata' => false,
+                'bordro' => null,
+                'mesaj' => 'Bu dönem için bordro bulunamadı.',
+            ]);
+        }
+
+        return response()->json([
+            'hata' => false,
+            'bordro' => [
+                'ay' => Carbon::create($yil, $ay, 1)->translatedFormat('F Y'),
+                'brut_maas' => (float)($puantaj->brut_maas ?? 0),
+                'net_maas' => (float)($puantaj->net_maas ?? 0),
+                'fazla_mesai_50' => (float)($puantaj->fazla_mesai_50_ucret ?? 0),
+                'fazla_mesai_100' => (float)($puantaj->fazla_mesai_100_ucret ?? 0),
+                'sgk_kesintisi' => (float)($puantaj->sgk_iscipay ?? 0),
+                'gelir_vergisi' => (float)($puantaj->gelir_vergisi ?? 0),
+                'avans' => (float)($puantaj->avans ?? 0),
+                'kesinti' => (float)($puantaj->kesinti ?? 0),
+                'calisma_gun' => (int)($puantaj->calisma_gunu ?? 0),
+                'devamsizlik_gun' => (int)($puantaj->devamsizlik_gunu ?? 0),
+            ],
+        ]);
     }
 }

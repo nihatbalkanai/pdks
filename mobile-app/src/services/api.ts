@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-// ⚠️ Development: Bilgisayarın local IP'si ve Artisan Serve Portu (8000)
+// ⚠️ Development: artisan serve (0.0.0.0:8000)
 // ⚠️ Production'da gerçek sunucu adresini yazın (örn: https://pdks.yourdomain.com/api/mobil)
 const API_BASE = __DEV__
     ? 'http://192.168.1.108:8000/api/mobil'
@@ -64,6 +64,10 @@ class ApiService {
     }
 
     // ═══ AUTH ═══
+    async firmaLogo(firmaKodu: string) {
+        return this.request<any>('GET', `/firma-logo/${firmaKodu.toUpperCase()}`);
+    }
+
     async giris(firmaKodu: string, tcNo: string, sifre: string, cihazBilgi?: object) {
         const data = await this.request<any>('POST', '/giris', {
             firma_kodu: firmaKodu,
@@ -112,6 +116,47 @@ class ApiService {
             yeni_sifre: yeniSifre,
             yeni_sifre_confirmation: yeniSifre,
         });
+    }
+
+    // ═══ YENİ MODÜLLER ═══
+    async izinlerim() {
+        return this.request('GET', '/izinlerim');
+    }
+
+    async izinTalebi(data: { izin_turu_id: number; tarih: string; bitis_tarihi?: string; aciklama?: string }) {
+        return this.request('POST', '/izin-talebi', data);
+    }
+
+    async izinTurleri() {
+        return this.request('GET', '/izin-turleri');
+    }
+
+    async puantajOzeti(ay?: number, yil?: number) {
+        const params = new URLSearchParams();
+        if (ay) params.append('ay', ay.toString());
+        if (yil) params.append('yil', yil.toString());
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        return this.request('GET', `/puantaj-ozeti${qs}`);
+    }
+
+    async vardiyaTakvimi(ay?: number, yil?: number) {
+        const params = new URLSearchParams();
+        if (ay) params.append('ay', ay.toString());
+        if (yil) params.append('yil', yil.toString());
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        return this.request('GET', `/vardiya-takvimi${qs}`);
+    }
+
+    async belgelerim() {
+        return this.request('GET', '/belgelerim');
+    }
+
+    async bordroOzeti(ay?: number, yil?: number) {
+        const params = new URLSearchParams();
+        if (ay) params.append('ay', ay.toString());
+        if (yil) params.append('yil', yil.toString());
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        return this.request('GET', `/bordro-ozeti${qs}`);
     }
 }
 

@@ -37,14 +37,14 @@ class IkYonetimController extends Controller
         $v = $request->validate([
             'personel_id' => 'required|integer',
             'izin_turu' => 'required|string',
-            'baslangic_tarihi' => 'required|date',
-            'bitis_tarihi' => 'required|date|after_or_equal:baslangic_tarihi',
+            'baslangic_tarihi' => 'required|date|after:2000-01-01|before:2100-01-01',
+            'bitis_tarihi' => 'required|date|before:2100-01-01|after_or_equal:baslangic_tarihi',
             'aciklama' => 'nullable|string|max:1000',
         ]);
 
         $baslangic = \Carbon\Carbon::parse($v['baslangic_tarihi']);
         $bitis = \Carbon\Carbon::parse($v['bitis_tarihi']);
-        $gunSayisi = $baslangic->diffInDays($bitis) + 1;
+        $gunSayisi = min($baslangic->diffInDays($bitis) + 1, 365);
 
         DB::table('izin_talepleri')->insert([
             'firma_id' => Auth::user()->firma_id,
@@ -163,7 +163,7 @@ class IkYonetimController extends Controller
             'egitim_adi' => 'required|string|max:255',
             'egitim_turu' => 'required|in:ic,dis,online,sertifika',
             'kurum' => 'nullable|string|max:255',
-            'baslangic_tarihi' => 'required|date',
+            'baslangic_tarihi' => 'required|date|after:2000-01-01|before:2100-01-01',
             'bitis_tarihi' => 'nullable|date',
             'sure_saat' => 'nullable|integer|min:1',
             'sertifika_no' => 'nullable|string|max:100',
@@ -208,7 +208,7 @@ class IkYonetimController extends Controller
         $v = $request->validate([
             'personel_id' => 'required|integer',
             'tur' => 'required|in:sozlu_uyari,yazili_uyari,kinama,ucret_kesintisi,fesih_uyarisi,diger',
-            'olay_tarihi' => 'required|date',
+            'olay_tarihi' => 'required|date|after:2000-01-01|before:2100-01-01',
             'olay_aciklamasi' => 'required|string|max:2000',
             'alinan_onlem' => 'nullable|string|max:1000',
             'personel_bilgilendirildi' => 'boolean',

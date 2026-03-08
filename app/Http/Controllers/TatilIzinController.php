@@ -78,7 +78,7 @@ class TatilIzinController extends Controller
     public function resmiTatilStore(Request $request)
     {
         $validated = $request->validate([
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'ad' => 'required|string|max:255',
             'tur' => 'nullable|string|max:100',
             'yarim_gun_mu' => 'boolean',

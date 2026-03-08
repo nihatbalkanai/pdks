@@ -62,7 +62,7 @@ class PersonelIzinYonetimController extends Controller
     {
         $validated = $request->validate([
             'izin_turu_id' => 'required|integer',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'gun_sayisi' => 'nullable|numeric|min:0.5',
             'bitis_tarihi' => 'nullable|date',
         ]);
@@ -133,7 +133,7 @@ class PersonelIzinYonetimController extends Controller
         $validated = $request->validate([
             'personel_id' => 'required|integer',
             'izin_turu_id' => 'required|integer',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'bitis_tarihi' => 'nullable|date|after_or_equal:tarih',
             'izin_tipi' => 'required|in:gunluk,saatlik',
             'giris_saati' => 'nullable|string',
@@ -233,7 +233,7 @@ class PersonelIzinYonetimController extends Controller
     {
         $validated = $request->validate([
             'izin_turu_id' => 'required|integer',
-            'tarih' => 'required|date',
+            'tarih' => 'required|date|after:2000-01-01|before:2100-01-01',
             'bitis_tarihi' => 'nullable|date|after_or_equal:tarih',
             'izin_tipi' => 'required|in:gunluk,saatlik',
             'giris_saati' => 'nullable|string',

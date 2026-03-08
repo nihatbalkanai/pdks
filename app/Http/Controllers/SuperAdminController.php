@@ -240,7 +240,7 @@ class SuperAdminController extends Controller
     {
         Gate::authorize('odemeleri_yonet');
         $request->validate([
-            'abonelik_bitis_tarihi' => 'required|date',
+            'abonelik_bitis_tarihi' => 'required|date|after:2000-01-01|before:2100-01-01',
             'paket_tipi' => 'required|in:Ücretsiz,Standart,Pro,Enterprise',
             'durum' => 'required|boolean'
         ]);

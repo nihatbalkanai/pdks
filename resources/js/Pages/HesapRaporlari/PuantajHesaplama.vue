@@ -44,6 +44,20 @@ const hesapla = async () => {
     if (selectedPersonelIds.value.length === 0) { Swal.fire('Uyarı', 'En az bir personel seçiniz.', 'warning'); return; }
     if (!tarihBaslangic.value || !tarihBitis.value) { Swal.fire('Uyarı', 'Tarih aralığını seçiniz.', 'warning'); return; }
 
+    // Tarih kontrolleri
+    const baslangic = new Date(tarihBaslangic.value);
+    const bitis = new Date(tarihBitis.value);
+    if (baslangic > bitis) {
+        Swal.fire('Tarih Hatası', 'Başlangıç tarihi, bitiş tarihinden sonra olamaz.\n\nLütfen tarihleri kontrol ediniz.', 'warning');
+        return;
+    }
+    const now = new Date();
+    const maxFuture = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+    if (baslangic > maxFuture || bitis > maxFuture) {
+        Swal.fire('Tarih Hatası', 'Seçilen tarih çok ileri bir tarih. Lütfen tarihleri kontrol ediniz.', 'warning');
+        return;
+    }
+
     isProcessing.value = true;
     progress.value = 10;
     sonuclar.value = null;
@@ -64,7 +78,15 @@ const hesapla = async () => {
             Swal.fire({ title: 'Başarılı!', text: `${res.data.sonuclar.length} personel hesaplandı.`, icon: 'success', timer: 2000 });
         }
     } catch (e) {
-        Swal.fire('Hata', e.response?.data?.message || 'Hesaplama sırasında hata oluştu.', 'error');
+        // Laravel validation hataları (422) detaylı göster
+        let mesaj = 'Hesaplama sırasında hata oluştu.';
+        if (e.response?.status === 422 && e.response?.data?.errors) {
+            const hatalar = Object.values(e.response.data.errors).flat();
+            mesaj = hatalar.join('\n');
+        } else if (e.response?.data?.message) {
+            mesaj = e.response.data.message;
+        }
+        Swal.fire('Hata', mesaj, 'error');
     } finally {
         isProcessing.value = false;
         setTimeout(() => { progress.value = 0; }, 1500);

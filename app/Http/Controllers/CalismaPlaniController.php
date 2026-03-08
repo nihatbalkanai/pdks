@@ -62,7 +62,7 @@ class CalismaPlaniController extends Controller
     public function satirGuncelle(Request $request, $grupId)
     {
         $validated = $request->validate([
-            'tarih'      => 'required|date',
+            'tarih'      => 'required|date|after:2000-01-01|before:2100-01-01',
             'vardiya_id' => 'nullable|integer',
             'tur'        => 'nullable|in:is_gunu,tatil,resmi_tatil',
         ]);
@@ -85,8 +85,8 @@ class CalismaPlaniController extends Controller
     public function topluAta(Request $request, $grupId)
     {
         $validated = $request->validate([
-            'baslangic'  => 'required|date',
-            'bitis'      => 'required|date|after_or_equal:baslangic',
+            'baslangic'  => 'required|date|after:2000-01-01|before:2100-01-01',
+            'bitis'      => 'required|date|before:2100-01-01|after_or_equal:baslangic',
             'vardiya_id' => 'nullable|integer',
             'tur'        => 'nullable|in:is_gunu,tatil,resmi_tatil',
             'gun_filtre' => 'nullable|in:hepsi,hafta_ici,hafta_sonu',
@@ -190,19 +190,37 @@ class CalismaPlaniController extends Controller
     {
         $validated = $request->validate([
             'yil'        => 'required|integer|min:2020|max:2035',
-            'vardiya_id' => 'nullable|integer', // Hafta içi varsayılan vardiya
+            'vardiya_id' => 'nullable|integer',
+            'sablon'     => 'nullable|string|in:standart,cumartesi_calisma,market,restoran,surekli',
+            'tatil_gunleri' => 'nullable|array', // Özel: [1,2,3,4,5,6,7] iso day numbers
         ]);
 
         $yil      = $validated['yil'];
         $firma_id = Auth::user()->firma_id ?? 1;
         $grup     = CalismaGrubu::where('firma_id', $firma_id)->findOrFail($grupId);
+        $sablon   = $validated['sablon'] ?? 'standart';
 
-        // O yıla ait resmi tatiller tablosunu çek
-        $resmiTatiller = ResmiTatil::where('firma_id', $firma_id)
+        // Şablon bazında tatil günlerini belirle (ISO: 1=Pzt, 7=Paz)
+        $tatilGunleri = match ($sablon) {
+            'standart'          => [6, 7],       // Cmt+Paz tatil (İş Kanunu)
+            'cumartesi_calisma' => [7],           // Sadece Pazar tatil
+            'market'            => [1],           // Sadece Pazartesi tatil
+            'restoran'          => [2],           // Sadece Salı tatil
+            'surekli'           => [],            // Hiç tatil yok (7/7)
+            default             => [6, 7],
+        };
+
+        // Özel tatil günleri gönderildiyse onları kullan
+        if (!empty($validated['tatil_gunleri'])) {
+            $tatilGunleri = $validated['tatil_gunleri'];
+        }
+
+        // O yıla ait resmi tatiller
+        $resmiTatiller = \App\Models\ResmiTatil::where('firma_id', $firma_id)
             ->where('yil', $yil)
             ->get()
             ->keyBy(function($item) {
-                return $item->tarih->format('Y-m-d');
+                return Carbon::parse($item->tarih)->format('Y-m-d');
             });
 
         if ($resmiTatiller->isEmpty()) {
@@ -211,36 +229,43 @@ class CalismaPlaniController extends Controller
             ], 422);
         }
 
-        // Önce o yılın tüm günlerini yükle/oluştur (hafta içi → is_gunu, hafta sonu → tatil)
-        $baslangic    = Carbon::create($yil, 1, 1);
-        $bitis        = Carbon::create($yil, 12, 31);
-        $current      = $baslangic->copy();
-        $olusturulan  = 0;
+        $baslangic   = Carbon::create($yil, 1, 1);
+        $bitis       = Carbon::create($yil, 12, 31);
+        $current     = $baslangic->copy();
+        $olusturulan = 0;
 
         while ($current->lte($bitis)) {
             $tarihStr = $current->format('Y-m-d');
-            
-            // Eğer bu tarih resmi_tatiller tablosunda varsa
+            $isoDay   = $current->dayOfWeekIso; // 1=Pzt, 7=Paz
+
             if ($resmiTatiller->has($tarihStr)) {
-                $tatilModel = $resmiTatiller->get($tarihStr);
-                $tur = $tatilModel->tur ?? 'resmi_tatil'; // Default to 'resmi_tatil' if 'tur' is null
-                
+                // Resmi tatil
                 CalismaPlan::updateOrCreate(
                     ['calisma_grubu_id' => $grup->id, 'tarih' => $tarihStr],
                     [
                         'firma_id'   => $firma_id,
                         'vardiya_id' => null,
-                        'tur'        => $tur,
+                        'tur'        => 'resmi_tatil',
                     ]
                 );
-            } else {
-                // Yoksa normal hafta içi / hafta sonu mantığı
+            } elseif (in_array($isoDay, $tatilGunleri)) {
+                // Şablona göre tatil günü
                 CalismaPlan::updateOrCreate(
                     ['calisma_grubu_id' => $grup->id, 'tarih' => $tarihStr],
                     [
                         'firma_id'   => $firma_id,
-                        'vardiya_id' => $current->isWeekday() ? ($validated['vardiya_id'] ?? null) : null,
-                        'tur'        => $current->isWeekend() ? 'tatil' : 'is_gunu',
+                        'vardiya_id' => null,
+                        'tur'        => 'tatil',
+                    ]
+                );
+            } else {
+                // İş günü
+                CalismaPlan::updateOrCreate(
+                    ['calisma_grubu_id' => $grup->id, 'tarih' => $tarihStr],
+                    [
+                        'firma_id'   => $firma_id,
+                        'vardiya_id' => $validated['vardiya_id'] ?? null,
+                        'tur'        => 'is_gunu',
                     ]
                 );
             }
@@ -249,9 +274,18 @@ class CalismaPlaniController extends Controller
             $olusturulan++;
         }
 
+        $sablonAdi = match ($sablon) {
+            'standart'          => 'Standart (İş Kanunu: Pzt-Cuma)',
+            'cumartesi_calisma' => 'Cumartesi Çalışma (Pzt-Cmt)',
+            'market'            => 'Market/Perakende (Sal-Paz, Pzt tatil)',
+            'restoran'          => 'Restoran (Çar-Pzt, Salı tatil)',
+            'surekli'           => '7/7 Sürekli Çalışma',
+            default             => 'Özel',
+        };
+
         return response()->json([
             'success' => true,
-            'message' => "{$yil} yılı planı başarıyla oluşturuldu.",
+            'message' => "{$yil} yılı planı '{$sablonAdi}' şablonuyla oluşturuldu.",
             'count'   => $olusturulan
         ]);
     }

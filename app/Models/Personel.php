@@ -3,12 +3,12 @@
 namespace App\Models;
 
 use App\Models\Scopes\FirmaScope;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Laravel\Sanctum\HasApiTokens;
 
-class Personel extends Model
+class Personel extends Authenticatable
 {
     use HasApiTokens, SoftDeletes;
 
@@ -31,6 +31,7 @@ class Personel extends Model
         'puantaj_parametre_id',
         'aylik_puantaj_parametre_id',
         'vardiya_id',
+        'calisma_grubu_id',
         'kart_no',
         'ad_soyad', // Still keeping ad_soyad for backward compatibility
         'ad',
@@ -73,6 +74,11 @@ class Personel extends Model
         'yol_parasi',
         'mobil_sifre',
     ];
+
+    public function calismaGrubu()
+    {
+        return $this->belongsTo(CalismaGrubu::class, 'calisma_grubu_id');
+    }
 
     public function izinler()
     {

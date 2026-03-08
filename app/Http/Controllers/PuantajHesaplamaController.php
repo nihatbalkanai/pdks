@@ -6,6 +6,7 @@ use App\Models\Personel;
 use App\Models\PdksKaydi;
 use App\Models\PdksGunlukOzet;
 use App\Models\GunlukPuantajParametresi;
+use App\Models\GunlukPuantajBordroAlani;
 use App\Models\AylikPuantajParametresi;
 use App\Models\ResmiTatil;
 use App\Models\PersonelIzin;
@@ -86,8 +87,8 @@ class PuantajHesaplamaController extends Controller
     {
         $request->validate([
             'personel_ids' => 'required|array|min:1',
-            'tarih_baslangic' => 'required|date',
-            'tarih_bitis' => 'required|date|after_or_equal:tarih_baslangic',
+            'tarih_baslangic' => 'required|date|after:2000-01-01|before:2100-01-01',
+            'tarih_bitis' => 'required|date|before:2100-01-01|after_or_equal:tarih_baslangic',
             'ilk_giris_son_cikis' => 'nullable|boolean',
         ]);
 
@@ -100,13 +101,20 @@ class PuantajHesaplamaController extends Controller
         $donemBitis = $bitis->copy()->endOfMonth();
         $ayTakvimGunu = $donemBaslangic->daysInMonth; // Şubat=28, Mart=31 vs.
 
-        // Resmi tatilleri al
-        $resmiTatiller = ResmiTatil::withoutGlobalScopes()
+        // Resmi tatilleri al (yarım gün bilgisiyle birlikte)
+        $resmiTatillerRaw = ResmiTatil::withoutGlobalScopes()
             ->where('firma_id', $firma_id)
             ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
-            ->pluck('tarih')
-            ->map(fn($t) => Carbon::parse($t)->format('Y-m-d'))
-            ->toArray();
+            ->get();
+        $resmiTatiller = []; // tarih => true (tam gün)
+        $yarimGunTatiller = []; // tarih => true (arife/yarım gün)
+        foreach ($resmiTatillerRaw as $rt) {
+            $t = Carbon::parse($rt->tarih)->format('Y-m-d');
+            $resmiTatiller[] = $t;
+            if ($rt->yarim_gun_mu) {
+                $yarimGunTatiller[$t] = true;
+            }
+        }
 
         // === BORDRO ALANLARINI YÜKLE (Dinamik) ===
         $bordroAlanlari = \Illuminate\Support\Facades\DB::table('bordro_alanlari')
@@ -114,6 +122,47 @@ class PuantajHesaplamaController extends Controller
             ->whereNull('deleted_at')
             ->orderBy('kod')
             ->get();
+
+        // === GÜNLÜK PUANTAJ BORDRO KURALLARI (Tümünü bir seferde yükle) ===
+        $tumBordroKurallari = GunlukPuantajBordroAlani::whereHas('gunlukPuantaj', function($q) use ($firma_id) {
+                $q->where('firma_id', $firma_id);
+            })
+            ->orderBy('basla')
+            ->get()
+            ->groupBy('gunluk_puantaj_id')
+            ->map(fn($items) => $items->toArray())
+            ->toArray();
+
+        // === ÇALIŞMA PLANLARINI YÜKLE ===
+        // Grup bazlı çalışma planları (BEYAZ YAKA, MAVİ YAKA)
+        $tumGrupPlanlari = \App\Models\CalismaPlan::where('firma_id', $firma_id)
+            ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
+            ->get()
+            ->groupBy('calisma_grubu_id')
+            ->map(function($items) {
+                $map = [];
+                foreach ($items as $item) {
+                    $map[Carbon::parse($item->tarih)->format('Y-m-d')] = $item->tur;
+                }
+                return $map;
+            })
+            ->toArray();
+
+        // Personel bazlı çalışma planları (kişiye özel override)
+        $tumPersonelPlanlari = \App\Models\PersonelCalismaPlan::withoutGlobalScopes()
+            ->where('firma_id', $firma_id)
+            ->whereIn('personel_id', $request->personel_ids)
+            ->whereBetween('tarih', [$baslangic->format('Y-m-d'), $bitis->format('Y-m-d')])
+            ->get()
+            ->groupBy('personel_id')
+            ->map(function($items) {
+                $map = [];
+                foreach ($items as $item) {
+                    $map[Carbon::parse($item->tarih)->format('Y-m-d')] = $item->tur;
+                }
+                return $map;
+            })
+            ->toArray();
 
         $sonuclar = [];
         $personeller = Personel::withoutGlobalScopes()
@@ -190,17 +239,10 @@ class PuantajHesaplamaController extends Controller
             $gunFarkHesapla = $aylikParam ? (bool)($aylikParam->gun_fark_hesapla ?? true) : true;
             $sskToplamaDahil = $aylikParam ? (bool)($aylikParam->ssk_rapor_toplama_dahil ?? false) : false;
 
-            // === GÜNLÜK PUANTAJ BORDRO ALANLARI (Mesai Kuralları) ===
-            // Her günlük puantaj parametresine bağlı mesai kuralları:
-            // Başla/Bitiş: Mesainin geçerli olduğu saat aralığı
-            // Çarpan: 150 = x1.5 (%50 FM), 200 = x2.0 (%100 FM)
-            // Min/Max: Minimum ve maksimum mesai süresi
+            // Bordro kuralları (önceden yüklenmiş cache'den)
             $puantajBordroKurallari = [];
-            if ($puantajParam) {
-                $puantajBordroKurallari = GunlukPuantajBordroAlani::where('gunluk_puantaj_id', $puantajParam->id)
-                    ->orderBy('basla')
-                    ->get()
-                    ->toArray();
+            if ($puantajParam && isset($tumBordroKurallari[$puantajParam->id])) {
+                $puantajBordroKurallari = $tumBordroKurallari[$puantajParam->id];
             }
 
             // === ÜCRET HESABI (ÖRNEK 30 GÜN / 225 SAAT STANDARDI ÜZERİNDEN DİNAMİK) ===
@@ -309,8 +351,37 @@ class PuantajHesaplamaController extends Controller
             for ($gun = $baslangic->copy(); $gun->lte($bitis); $gun->addDay()) {
                 $tarih = $gun->format('Y-m-d');
                 $haftaGunu = $gun->dayOfWeekIso; // 1=Pzt, 7=Paz
-                $haftaSonu = $haftaGunu >= 6;
+
+                // Çalışma planı öncelik sırası:
+                // 1. Personele özel plan (personel_calisma_planlari)
+                // 2. Grup planı (calisma_planlari — BEYAZ YAKA/MAVİ YAKA)
+                // 3. Varsayılan: Cumartesi+Pazar = tatil
                 $resmiTatilMi = in_array($tarih, $resmiTatiller);
+                $planTuru = null;
+                $personelPlani = $tumPersonelPlanlari[$personel->id] ?? [];
+                $grupId = $personel->calisma_grubu_id;
+                $grupPlani = $grupId ? ($tumGrupPlanlari[$grupId] ?? []) : [];
+
+                if (isset($personelPlani[$tarih])) {
+                    $planTuru = $personelPlani[$tarih];
+                } elseif (isset($grupPlani[$tarih])) {
+                    $planTuru = $grupPlani[$tarih];
+                }
+
+                // Plan varsa ona göre, yoksa varsayılan hafta sonu mantığı
+                if ($planTuru) {
+                    $haftaSonu = ($planTuru === 'tatil');
+                    if ($planTuru === 'resmi_tatil') {
+                        $resmiTatilMi = true;
+                        $haftaSonu = false;
+                    }
+                    // Plan 'is_gunu' diyorsa cumartesi bile olsa iş günü
+                    if ($planTuru === 'is_gunu') {
+                        $haftaSonu = false;
+                    }
+                } else {
+                    $haftaSonu = $haftaGunu >= 6; // Varsayılan: C.tesi+Pazar
+                }
                 $izinBilgi = $izinliGunler[$tarih] ?? null;
                 $izinTipi = $izinBilgi ? $izinBilgi['tip'] : null;
 
@@ -370,13 +441,37 @@ class PuantajHesaplamaController extends Controller
                         $bordroIzinSayac[$izinBordroKod] = ($bordroIzinSayac[$izinBordroKod] ?? 0) + 1;
                     }
                 } elseif ($resmiTatilMi) {
-                    if ($calismaDakika > 0) {
-                        $durum = 'tatil_calisma';
-                        $fm100Dakika += $calismaDakika;
-                        $fm100Gun++;
+                    $arifeGunuMu = isset($yarimGunTatiller[$tarih]);
+
+                    if ($arifeGunuMu) {
+                        // Arife (Yarım Gün) — İş Kanununa göre yarım gün çalışılır
+                        $yarimGunDakika = $gunlukCalismaDakika / 2; // Standart yarım gün
+                        if ($calismaDakika > 0) {
+                            if ($calismaDakika > $yarimGunDakika) {
+                                // Yarım günden fazla çalışmış → fazlası %100 FM
+                                $durum = 'arife_fazla_mesai';
+                                $fm100Dakika += ($calismaDakika - $yarimGunDakika);
+                                $fm100Gun += 0.5;
+                            } else {
+                                // Yarım gün veya altında çalışmış → normal
+                                $durum = 'arife_calisma';
+                            }
+                            $gelinenGunSayisi++;
+                        } else {
+                            // Arife günü çalışmamış
+                            $durum = 'resmi_tatil';
+                            $resmiTatilGun += 0.5;
+                        }
                     } else {
-                        $durum = 'resmi_tatil';
-                        $resmiTatilGun++;
+                        // Tam gün resmi tatil
+                        if ($calismaDakika > 0) {
+                            $durum = 'tatil_calisma';
+                            $fm100Dakika += $calismaDakika;
+                            $fm100Gun++;
+                        } else {
+                            $durum = 'resmi_tatil';
+                            $resmiTatilGun++;
+                        }
                     }
                     // Resmi tatil normal güne dahil (30 gün standardı)
                     $normalCalismaGun++;
@@ -406,29 +501,33 @@ class PuantajHesaplamaController extends Controller
                     if ($fmFark > $fmToleransDakika) {
                         if (!empty($puantajBordroKurallari) && $cikis) {
                             // Kural bazlı mesai hesaplama
-                            $cikisSaat = Carbon::parse($tarih . ' ' . $cikis);
-                            foreach ($puantajBordroKurallari as $kural) {
-                                $kuralBasla = Carbon::parse($tarih . ' ' . $kural['basla']);
-                                $kuralBitis = Carbon::parse($tarih . ' ' . $kural['bitis']);
-                                $minDk = $this->saatToDakika($kural['min_sure'] ?? '00:00:00');
-                                $maxDk = $this->saatToDakika($kural['max_sure'] ?? '24:00:00');
-                                $carpan = ($kural['carpan'] ?? 150);
+                            try {
+                                $cikisSaat = Carbon::parse($cikis);
+                                foreach ($puantajBordroKurallari as $kural) {
+                                    $kuralBaslaSaat = substr($kural['basla'] ?? '00:00:00', 0, 8);
+                                    $kuralBitisSaat = substr($kural['bitis'] ?? '23:59:59', 0, 8);
+                                    $kuralBasla = Carbon::parse($tarih . ' ' . $kuralBaslaSaat);
+                                    $kuralBitis = Carbon::parse($tarih . ' ' . $kuralBitisSaat);
+                                    $minDk = $this->saatToDakika($kural['min_sure'] ?? '00:00:00');
+                                    $maxDk = $this->saatToDakika($kural['max_sure'] ?? '24:00:00');
+                                    $carpan = ($kural['carpan'] ?? 150);
 
-                                // Çıkış saati bu kuralın aralığında mı?
-                                if ($cikisSaat->gte($kuralBasla)) {
-                                    // Kural aralığında çalışılan dakika
-                                    $kuralSonSaat = $cikisSaat->gt($kuralBitis) ? $kuralBitis : $cikisSaat;
-                                    $kuralDakika = max(0, $kuralSonSaat->diffInMinutes($kuralBasla));
-                                    // Min/Max sınırları uygula
-                                    if ($kuralDakika >= $minDk) {
-                                        $kuralDakika = min($kuralDakika, $maxDk);
-                                        if ($carpan >= 200) {
-                                            $fm100Dakika += $kuralDakika;
-                                        } else {
-                                            $fm50Dakika += $kuralDakika;
+                                    if ($cikisSaat->gte($kuralBasla)) {
+                                        $kuralSonSaat = $cikisSaat->gt($kuralBitis) ? $kuralBitis : $cikisSaat;
+                                        $kuralDakika = max(0, $kuralSonSaat->diffInMinutes($kuralBasla));
+                                        if ($kuralDakika >= $minDk) {
+                                            $kuralDakika = min($kuralDakika, $maxDk);
+                                            if ($carpan >= 200) {
+                                                $fm100Dakika += $kuralDakika;
+                                            } else {
+                                                $fm50Dakika += $kuralDakika;
+                                            }
                                         }
                                     }
                                 }
+                            } catch (\Exception $e) {
+                                // Parse hatası olursa basit hesaplamaya düş
+                                $fm50Dakika += $fmFark;
                             }
                         } else {
                             // Kural yoksa: tüm fark %50 mesai
